@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FENIX CORE | Command Center L7</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
+    <style>
+        /* ==========================================================================
+           1. CORE VARIABLES & DESIGN SYSTEM (ABYSSAL CYBERPUNK)
+           ========================================================================== */
+        :root {
+            --bg-abyss: #050507;
+            --neon-blue: #00f0ff;
+            --neon-blue-glow: rgba(0, 240, 255, 0.3);
+            --neon-red: #ff003c;
+            --neon-red-glow: rgba(255, 0, 60, 0.3);
+            --neon-green: #00ff66;
+            --neon-green-glow: rgba(0, 255, 102, 0.3);
+            --glass-bg: rgba(10, 10, 15, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.05);
+            --text-main: #e0e0e0;
+            --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+            --font-ui: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        /* ==========================================================================
+           2. GLOBAL RESET & HARDWARE ACCELERATED BACKGROUNDS
+           ========================================================================== */
+        *, *::before, *::after { box-sizing: border-box; }
+        
+        body {
+            margin: 0; padding: 2rem;
+            background-color: var(--bg-abyss);
+            color: var(--text-main);
+            font-family: var(--font-ui);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+            scrollbar-width: thin;
+            scrollbar-color: var(--neon-blue) var(--bg-abyss);
+        }
+
+        /* Custom Webkit Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-abyss); }
+        ::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 4px; }
+
+        /* Matriz de puntos de fondo (GPU Rendered) */
+        body::before {
+            content: ''; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 20px 20px; z-index: -2; pointer-events: none;
+        }
+
+        /* Scanlines CRT para estética militar */
+        body::after {
+            content: ''; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%; z-index: -1; pointer-events: none; opacity: 0.4;
+        }
+
+        /* ==========================================================================
+           3. GLASSMORPHISM L7 & GRID LAYOUT
+           ========================================================================== */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.02);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Brillo dinámico en el borde superior del panel */
+        .glass-panel::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-blue), transparent);
+            opacity: 0.5;
+        }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; position: relative; }
+        .header h1 { 
+            margin: 0; font-size: 2rem; font-weight: 300; letter-spacing: 3px; 
+            text-transform: uppercase; border-left: 4px solid var(--neon-blue); 
+            padding-left: 15px; text-shadow: 0 0 10px var(--neon-blue-glow);
+        }
+        
+        .grid-layout { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 2rem; align-items: start; }
+        @media (max-width: 1200px) { .grid-layout { grid-template-columns: 1fr; } }
+
+        /* ==========================================================================
+           4. COMPONENTES DE INTERFAZ (UI/UX)
+           ========================================================================== */
+        /* Inputs Terminal-Style */
+        .input-god {
+            width: 100%; background: rgba(0,0,0,0.7); border: 1px solid var(--glass-border);
+            color: var(--neon-blue); padding: 15px; border-radius: 6px; font-size: 1.1rem;
+            font-family: var(--font-mono); box-sizing: border-box; outline: none; 
+            transition: all 0.3s ease; letter-spacing: 1px;
+        }
+        .input-god:focus { border-color: var(--neon-blue); box-shadow: 0 0 15px var(--neon-blue-glow); background: rgba(0,240,255,0.05); }
+        .input-god::placeholder { color: rgba(0, 240, 255, 0.3); }
+
+        /* Editor de Código */
+        #editor-wrapper {
+            position: relative; margin-top: 1rem; border-radius: 8px; overflow: hidden;
+            border: 1px solid var(--glass-border); box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+        #editor-container { height: 550px; width: 100%; }
+        
+        /* HUD del Editor (Metrics Overlay) */
+        .editor-hud {
+            position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.8);
+            border-top: 1px solid var(--glass-border); padding: 5px 15px; display: flex;
+            justify-content: space-between; font-family: var(--font-mono); font-size: 0.75rem;
+            color: #888; z-index: 10; backdrop-filter: blur(5px);
+        }
+        .hud-metric span { color: var(--neon-blue); font-weight: bold; }
+
+        /* Botón Nuclear Fénix */
+        .btn-forge {
+            background: linear-gradient(45deg, transparent 5%, rgba(0,240,255,0.1) 5%);
+            border: 1px solid var(--neon-blue); color: var(--neon-blue);
+            padding: 15px 24px; font-size: 1.1rem; border-radius: 4px; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 2px; transition: all 0.3s;
+            width: 100%; margin-top: 1.5rem; font-weight: bold;
+            position: relative; overflow: hidden; font-family: var(--font-mono);
+        }
+        .btn-forge::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0,240,255,0.4), transparent);
+            transition: left 0.5s;
+        }
+        .btn-forge:hover { background: var(--neon-blue); color: #000; box-shadow: 0 0 25px var(--neon-blue-glow); }
+        .btn-forge:hover::before { left: 100%; }
+        .btn-forge:disabled { border-color: #555; color: #555; cursor: not-allowed; background: transparent; box-shadow: none; }
+
+        /* ==========================================================================
+           5. ARSENAL Y LISTAS DE CUARENTENA
+           ========================================================================== */
+        .sim-list { display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1rem; max-height: 400px; overflow-y: auto; padding-right: 5px; }
+        .sim-item {
+            display: flex; justify-content: space-between; align-items: center; padding: 1rem;
+            background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: 8px;
+            transition: all 0.2s ease; border-left: 3px solid transparent;
+        }
+        .sim-item:hover { transform: translateX(5px); background: rgba(255,255,255,0.03); }
+        
+        /* Badges de Estado */
+        .badge { padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-family: var(--font-mono); font-weight: bold; letter-spacing: 1px; }
+        .badge-quarantine { background: rgba(255, 0, 60, 0.1); color: var(--neon-red); border: 1px solid var(--neon-red); box-shadow: 0 0 10px var(--neon-red-glow); }
+        .badge-live { background: rgba(0, 255, 102, 0.1); color: var(--neon-green); border: 1px solid var(--neon-green); box-shadow: 0 0 10px var(--neon-green-glow); }
+        
+        .sim-title { font-weight: 600; font-size: 1.05rem; margin-bottom: 4px; color: #fff; }
+        .sim-id { font-size: 0.75rem; color: #777; font-family: var(--font-mono); }
+        
+        a.action-link { 
+            color: #fff; text-decoration: none; border: 1px solid rgba(255,255,255,0.3); 
+            padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; transition: 0.3s; 
+            background: rgba(0,0,0,0.5); font-family: var(--font-mono);
+        }
+        a.action-link:hover { background: #fff; color: #000; box-shadow: 0 0 15px rgba(255,255,255,0.5); }
+
+        /* ==========================================================================
+           6. SISTEMA DE TOASTS HOLOGRÁFICOS (NOTIFICACIONES L7)
+           ========================================================================== */
+        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .fenix-toast {
+            min-width: 300px; padding: 15px 20px; border-radius: 8px; backdrop-filter: blur(10px);
+            font-family: var(--font-mono); font-size: 0.9rem; color: #fff; display: flex; align-items: center; justify-content: space-between;
+            animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; border-left: 4px solid;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .toast-success { background: rgba(0, 255, 102, 0.1); border-left-color: var(--neon-green); border: 1px solid var(--neon-green); }
+        .toast-error { background: rgba(255, 0, 60, 0.1); border-left-color: var(--neon-red); border: 1px solid var(--neon-red); }
+        .toast-warn { background: rgba(255, 170, 0, 0.1); border-left-color: #ffaa00; border: 1px solid #ffaa00; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <div id="toast-container"></div>
+
+    <div class="header glass-panel">
+        <h1>Fenix <span style="color: var(--neon-blue);">Command Center</span></h1>
+        <div style="font-family: var(--font-mono); font-size: 0.9rem;">
+            SYS.STATUS: <strong style="color: var(--neon-green); text-shadow: 0 0 5px var(--neon-green);">ONLINE</strong> | 
+            GLOBAL VIEWS: <strong style="color: var(--neon-blue);">{{ total_vistas }}</strong>
+        </div>
+    </div>
+
+    <div class="grid-layout">
+        <div class="glass-panel" style="border-top-color: var(--neon-blue);">
+            <h2 style="margin-top:0; font-weight: 300; display: flex; justify-content: space-between;">
+                <span>[1] FORJA DE INYECCIÓN</span>
+                <span style="font-size: 0.8rem; color: #666;">(ZERO-TRUST PROTOCOL)</span>
+            </h2>
+            
+            <input type="text" id="sim-titulo" class="input-god" placeholder="> Ingrese nombre clave del payload (Ej: Ley de Ohm - V2)" autocomplete="off">
+            
+            <div id="editor-wrapper">
+                <div id="editor-container"></div>
+                <div class="editor-hud">
+                    <div class="hud-metric">PAYLOAD SIZE: <span id="hud-size">0 KB</span></div>
+                    <div class="hud-metric">EST. TOKENS: <span id="hud-tokens">0</span></div>
+                    <div class="hud-metric">SAST STATUS: <span id="hud-sast" style="color: var(--neon-green);">CLEAR</span></div>
+                </div>
+            </div>
+
+            <button id="btn-inject" class="btn-forge">Iniciar Secuencia de Cuarentena</button>
+        </div>
+
+        <div>
+            <div class="glass-panel" style="border-top-color: var(--neon-red); margin-bottom: 2rem;">
+                <h2 style="margin-top:0; font-weight: 300; color: var(--text-main);">[2] SALA DE CUARENTENA</h2>
+                <p style="font-size: 0.85rem; color: #888; margin-top: -5px;">Puntos de acceso aislados. Requieren validación de telemetría.</p>
+                
+                <div class="sim-list">
+                    {% for sim in simuladores_cuarentena %}
+                    <div class="sim-item" style="border-left-color: var(--neon-red);">
+                        <div>
+                            <div class="sim-title">{{ sim.titulo }}</div>
+                            <div class="sim-id">ID: {{ sim.slug }} | <span class="badge badge-quarantine">SANDBOX</span></div>
+                        </div>
+                        <a href="{% url 'fenix_sandbox' sim.slug %}" class="action-link">Auditar -></a>
+                    </div>
+                    {% empty %}
+                    <div style="padding: 2rem; text-align: center; color: #555; font-family: var(--font-mono); border: 1px dashed rgba(255,255,255,0.1); border-radius: 8px;">
+                        [ NO HAY ANOMALÍAS EN CUARENTENA ]
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="glass-panel" style="border-top-color: var(--neon-green);">
+                <h2 style="margin-top:0; font-weight: 300;">[3] ARSENAL DESPLEGADO</h2>
+                
+                <div class="sim-list">
+                    {% for sim in simuladores_activos %}
+                    <div class="sim-item" style="border-left-color: var(--neon-green);">
+                        <div>
+                            <div class="sim-title">{{ sim.titulo }}</div>
+                            <div class="sim-id">
+                                VISTAS: <span style="color:var(--neon-blue)">{{ sim.vistas }}</span> | 
+                                SUCCESS: <span style="color:var(--neon-green)">{{ sim.tasa_exito }}%</span>
+                            </div>
+                        </div>
+                        <div class="badge badge-live">LIVE</div>
+                    </div>
+                    {% empty %}
+                    <p style="color: #666; font-style: italic; font-family: var(--font-mono);">[ MATRIZ VACÍA ]</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * CLASE PRINCIPAL: Fénix Command Orchestrator
+         * Ingeniería Tel Aviv / Patrón Singleton
+         */
+        class FenixOrchestrator {
+            constructor() {
+                this.editor = null;
+                this.btnInject = document.getElementById('btn-inject');
+                this.inputTitle = document.getElementById('sim-titulo');
+                this.hudSize = document.getElementById('hud-size');
+                this.hudTokens = document.getElementById('hud-tokens');
+                this.hudSast = document.getElementById('hud-sast');
+                this.audioCtx = null;
+                
+                this.initAudioEngine();
+                this.initMonaco();
+                this.bindEvents();
+            }
+
+            // --- MOTOR DE AUDIO NEUROLÓGICO ---
+            initAudioEngine() {
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.audioCtx = new AudioContext();
+                } catch(e) { console.warn("Web Audio API no soportada."); }
+            }
+
+            playBeep(type = 'success') {
+                if(!this.audioCtx) return;
+                if(this.audioCtx.state === 'suspended') this.audioCtx.resume();
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+                osc.connect(gain); gain.connect(this.audioCtx.destination);
+                
+                if (type === 'success') { osc.type = 'sine'; osc.frequency.setValueAtTime(880, this.audioCtx.currentTime); gain.gain.setValueAtTime(0.1, this.audioCtx.currentTime); } 
+                else if (type === 'error') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, this.audioCtx.currentTime); gain.gain.setValueAtTime(0.1, this.audioCtx.currentTime); }
+                else if (type === 'type') { osc.type = 'square'; osc.frequency.setValueAtTime(1200, this.audioCtx.currentTime); gain.gain.setValueAtTime(0.01, this.audioCtx.currentTime); }
+
+                osc.start(); osc.stop(this.audioCtx.currentTime + 0.05);
+            }
+
+            // --- SISTEMA DE TOASTS (UI Engine) ---
+            showToast(message, type = 'success') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                toast.className = `fenix-toast toast-${type}`;
+                toast.innerHTML = `<span>[${type.toUpperCase()}] ${message}</span>`;
+                
+                container.appendChild(toast);
+                this.playBeep(type);
+
+                setTimeout(() => {
+                    toast.style.animation = 'fadeOut 0.4s forwards';
+                    setTimeout(() => toast.remove(), 400);
+                }, 4000);
+            }
+
+            // --- MOTOR MONACO VS CODE ---
+            initMonaco() {
+                require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' }});
+                require(['vs/editor/editor.main'], () => {
+                    // Tema Custom God-Tier
+                    monaco.editor.defineTheme('fenix-abyss', {
+                        base: 'vs-dark', inherit: true,
+                        rules: [{ background: '050507' }],
+                        colors: { 'editor.background': '#050507', 'editor.lineHighlightBackground': '#00f0ff1a' }
+                    });
+
+                    this.editor = monaco.editor.create(document.getElementById('editor-container'), {
+                        value: "\n\n<style>\n  /* Estilos Acelerados */\n</style>\n\n<script>\n  // Core Lógica Vanilla JS\n<\/script>",
+                        language: 'html', theme: 'fenix-abyss',
+                        automaticLayout: true, minimap: { enabled: true, scale: 0.75 },
+                        fontSize: 14, fontFamily: "'JetBrains Mono', monospace",
+                        formatOnPaste: true, renderLineHighlight: 'all', cursorBlinking: 'smooth'
+                    });
+
+                    // Event Listener del Editor (Debounced para Big O Performance)
+                    let timeout;
+                    this.editor.onDidChangeModelContent(() => {
+                        clearTimeout(timeout);
+                        timeout = setTimeout(() => this.analyzePayload(), 300);
+                        this.playBeep('type'); // Sonido mecánico de tipeo
+                    });
+                });
+            }
+
+            // --- SAST & ANALÍTICA CLIENT-SIDE ---
+            analyzePayload() {
+                const code = this.editor.getValue();
+                const bytes = new Blob([code]).size;
+                
+                // FinOps: Cálculo estimado (1 token ~ 4 chars)
+                const tokens = Math.floor(code.length / 4); 
+                
+                this.hudSize.innerText = bytes > 1024 ? (bytes/1024).toFixed(2) + ' KB' : bytes + ' B';
+                this.hudTokens.innerText = tokens.toLocaleString();
+
+                // Scanner SAST Pre-vuelo (Firmas maliciosas)
+                const blacklisted = /document\.cookie|eval\(|window\.localStorage/i;
+                if (blacklisted.test(code)) {
+                    this.hudSast.innerText = "WARNING: UNSECURE API";
+                    this.hudSast.style.color = "var(--neon-red)";
+                } else {
+                    this.hudSast.innerText = "CLEAR";
+                    this.hudSast.style.color = "var(--neon-green)";
+                }
+            }
+
+            // --- FETCH API: INYECCIÓN ZERO-TRUST ---
+            bindEvents() {
+                this.btnInject.addEventListener('click', async () => {
+                    const titulo = this.inputTitle.value.trim();
+                    if(!this.editor) return;
+                    const codigo = this.editor.getValue().trim();
+
+                    // Validación QA L7
+                    if(!titulo || titulo.length < 5) return this.showToast('Violación Lógica: El título es demasiado corto.', 'warn');
+                    if(codigo.length < 100) return this.showToast('Violación Estructural: El payload está vacío o incompleto.', 'warn');
+                    if(this.hudSast.innerText === "WARNING: UNSECURE API") {
+                        if(!confirm("Advertencia de Seguridad: El código contiene APIs no seguras. ¿Forzar inyección a la cuarentena de todos modos?")) return;
+                    }
+
+                    // Bloqueo de Interfaz
+                    this.btnInject.innerText = "INYECTANDO MATRIZ...";
+                    this.btnInject.disabled = true;
+
+                    try {
+                        const response = await fetch("{% url 'api_inyectar_payload' %}", {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': '{{ csrf_token }}'
+                            },
+                            body: JSON.stringify({ titulo: titulo, codigo_fuente: codigo, motor: 'Arquitecto Elite Manual' })
+                        });
+
+                        const data = await response.json();
+                        
+                        if(data.success) {
+                            this.showToast(`Payload [${data.slug}] aislado exitosamente.`, 'success');
+                            this.btnInject.innerText = "SECUENCIA COMPLETADA";
+                            this.btnInject.style.background = "var(--neon-green)";
+                            this.btnInject.style.color = "#000";
+                            
+                            // Recarga para ver reflejado en la cuarentena
+                            setTimeout(() => location.reload(), 2000); 
+                        } else {
+                            throw new Error(data.error || 'Respuesta no válida del servidor.');
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        this.showToast('Colapso de Red: ' + error.message, 'error');
+                        this.btnInject.innerText = "REINTENTAR SECUENCIA";
+                        this.btnInject.disabled = false;
+                    }
+                });
+            }
+        }
+
+        // Inicialización del Motor (Auto-Ignition)
+        document.addEventListener('DOMContentLoaded', () => {
+            window.fenixApp = new FenixOrchestrator();
+        });
+    </script>
+</body>
+</html>

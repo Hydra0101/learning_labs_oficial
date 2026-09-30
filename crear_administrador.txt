@@ -1,0 +1,2 @@
+python3 manage.py shell -c "from django.contrib.auth.models import User; from tasks.models import Perfil; u, _ = User.objects.get_or_create(username='admin2', defaults={'email': 'admin2@learninglabs.edu.co'}); u.set_password('9967112fhr'); u.is_staff = True; u.is_superuser = True; u.save(); p, _ = Perfil.objects.get_or_create(user=u); p.rol = 'ADMINISTRADOR'; p.save(); print('\n[✔] NUEVO ADMINISTRADOR CREADO: admin2 (Clave: 9967112fhr | Rol: ADMINISTRADOR)')"
+

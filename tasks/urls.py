@@ -3,6 +3,7 @@ from . import views, views_pdf, views_shadow  # <--- AGREGA views_shadow AQUÍ
 from . import views_import  # <--- AGREGA ESTA LÍNEA
 from tasks import views_admin  # <--- Agrega esto
 from . import views_simuladores
+#from .views import RegisterAPIView, LoginAPIView
 
 from django.urls import path, include
 
@@ -51,11 +52,10 @@ urlpatterns = [
 
     path('signout/', views.signout, name='signout'),
 
-    path('logout/', views.signout, name='logout'), 
-
-
-
-    # ======================================================
+    path('logout/', views.signout, name='logout'),
+    
+    
+   # ======================================================
 
     # RUTAS DE CURSOS DEMO / CONTENIDO
 
@@ -483,6 +483,7 @@ urlpatterns = [
     path('api/ai-agent/', ai_views.api_ai_agent, name='api_ai_agent'),
     path('laboratorios/', include('tasks.urls_simuladores')),
     path('laboratorios/raw/<slug:slug>/', views_simuladores.render_raw_simulador, name='render_raw'),
+    path('admin-fenix/', include('tasks.urls_admin_simuladores')),
 
 
 ]
