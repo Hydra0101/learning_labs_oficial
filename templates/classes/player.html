@@ -1,0 +1,797 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    /* ==========================================================================
+       1. ARQUITECTURA DE VARIABLES: DARK CYBERNETIC (SILICON VALLEY TIER)
+       ========================================================================== */
+    :root {
+        --sv-bg-core: #020617; /* Slate 950 */
+        --sv-surface-1: rgba(15, 23, 42, 0.85);
+        --sv-surface-2: rgba(30, 41, 59, 0.7);
+        --sv-border: rgba(255, 255, 255, 0.08);
+        --sv-primary: #a855f7; /* Purple 500 */
+        --sv-primary-glow: rgba(168, 85, 247, 0.4);
+        --sv-accent: #38bdf8; /* Light Blue */
+        --sv-rose: #f43f5e;
+        --sv-text-main: #f8fafc;
+        --sv-text-muted: #94a3b8;
+    }
+
+    body {
+        background-color: var(--sv-bg-core) !important;
+        color: var(--sv-text-main);
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* SCROLLBAR PREMIUM */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--sv-primary); }
+
+    /* CONTENEDOR FLUIDO EDGE-TO-EDGE EN MÓVIL */
+    .master-container {
+        width: 100%;
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 0;
+        padding-bottom: 6rem;
+    }
+
+    @media (min-width: 768px) {
+        .master-container { padding: 1.5rem; }
+    }
+
+    /* ==========================================================================
+       2. TOP NAVIGATION (STICKY GLASSMORPHISM)
+       ========================================================================== */
+    .nav-glass {
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border-bottom: 1px solid var(--sv-border);
+        padding: 0.75rem 1rem;
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+    }
+
+    @media (min-width: 768px) {
+        .nav-glass {
+            border: 1px solid var(--sv-border);
+            border-radius: 18px;
+            margin-bottom: 1.5rem;
+            position: relative;
+            top: auto;
+        }
+    }
+
+    /* ==========================================================================
+       3. REPRODUCTOR DE VIDEO (NATIVE CINEMA EXPERIENCE)
+       ========================================================================== */
+    .video-card {
+        background: #000;
+        border-bottom: 1px solid var(--sv-border);
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
+    }
+
+    @media (min-width: 768px) {
+        .video-card {
+            border: 1px solid var(--sv-border);
+            border-radius: 24px;
+            overflow: hidden;
+        }
+    }
+
+    .video-ratio-box {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background: #000;
+    }
+
+    .video-ratio-box video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        outline: none;
+        display: block;
+    }
+
+    /* ==========================================================================
+       4. CONSOLA DE ACCIONES Y METADATOS
+       ========================================================================== */
+    .action-console {
+        background: #0f172a;
+        padding: 1.25rem 1rem;
+    }
+
+    @media (min-width: 768px) {
+        .action-console { padding: 1.5rem 2rem; }
+    }
+
+    /* Contenedor de controles que no colapsa en celulares */
+    .controls-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        background: rgba(0, 0, 0, 0.3);
+        padding: 0.75rem;
+        border-radius: 16px;
+        border: 1px solid var(--sv-border);
+    }
+
+    @media (min-width: 576px) {
+        .controls-wrapper {
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+        }
+    }
+
+    /* Selector de Velocidad Táctil (Scroll horizontal en pantallas micro) */
+    .speed-segment-scroll {
+        display: flex;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    
+    .speed-segment-scroll::-webkit-scrollbar { display: none; }
+
+    .speed-segment-control {
+        display: inline-flex;
+        background: rgba(2, 6, 23, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 100px;
+        padding: 4px;
+        flex-shrink: 0;
+    }
+
+    .speed-segment-btn {
+        background: transparent;
+        color: var(--sv-text-muted);
+        border: none;
+        border-radius: 100px;
+        padding: 0.5rem 1.2rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        touch-action: manipulation;
+    }
+
+    .speed-segment-btn:hover { color: #fff; }
+
+    .speed-segment-btn.active {
+        background: var(--sv-primary);
+        color: #fff;
+        box-shadow: 0 0 12px var(--sv-primary-glow);
+    }
+
+    /* Botón Like Neural */
+    .btn-neural-like {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #fff;
+        padding: 0.6rem 1.5rem;
+        border-radius: 100px;
+        font-size: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        touch-action: manipulation;
+        user-select: none;
+        width: 100%;
+        flex-shrink: 0;
+    }
+
+    @media (min-width: 576px) {
+        .btn-neural-like { width: auto; }
+    }
+
+    .btn-neural-like.liked {
+        background: rgba(244, 63, 94, 0.15);
+        border-color: var(--sv-rose);
+        color: var(--sv-rose);
+        box-shadow: 0 0 20px rgba(244, 63, 94, 0.3);
+    }
+
+    .btn-neural-like.liked i { animation: heartbeat 0.5s ease-out; }
+    .btn-neural-like:active { transform: scale(0.95); }
+
+    @keyframes heartbeat {
+        0% { transform: scale(1); }
+        40% { transform: scale(1.3); }
+        100% { transform: scale(1); }
+    }
+
+    /* ==========================================================================
+       5. FORO ACADÉMICO 
+       ========================================================================== */
+    .forum-container {
+        background: var(--sv-surface-1);
+        border-top: 1px solid var(--sv-border);
+        border-bottom: 1px solid var(--sv-border);
+        padding: 1.5rem 1rem;
+    }
+
+    @media (min-width: 768px) {
+        .forum-container {
+            border: 1px solid var(--sv-border);
+            border-radius: 24px;
+            padding: 2.5rem 2rem;
+            backdrop-filter: blur(24px);
+        }
+    }
+
+    .cyber-textarea-wrapper {
+        background: rgba(2, 6, 23, 0.5);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 18px;
+        transition: all 0.3s ease;
+        padding: 0.25rem;
+    }
+
+    .cyber-textarea-wrapper:focus-within {
+        border-color: var(--sv-primary);
+        box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.15);
+        background: #020617;
+    }
+
+    .comment-card {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        border-radius: 18px;
+        padding: 1.25rem;
+        transition: transform 0.2s ease, background 0.2s;
+    }
+
+    .comment-card:hover {
+        background: rgba(30, 41, 59, 0.8);
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .ts-pill {
+        background: rgba(56, 189, 248, 0.1);
+        color: var(--sv-accent);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        border-radius: 8px;
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .ts-pill:hover {
+        background: var(--sv-accent);
+        color: #000;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    }
+
+    .btn-purgar {
+        background: transparent;
+        border: none;
+        color: var(--sv-muted);
+        padding: 6px 10px;
+        border-radius: 8px;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    .btn-purgar:hover {
+        color: var(--sv-rose);
+        background: rgba(244, 63, 94, 0.15);
+        transform: scale(1.1);
+    }
+
+    /* ==========================================================================
+       6. SYLLABUS (TEMARIO LATERAL)
+       ========================================================================== */
+    .syllabus-wrapper {
+        background: var(--sv-surface-1);
+        border-top: 1px solid var(--sv-border);
+    }
+
+    @media (min-width: 1200px) {
+        .syllabus-wrapper {
+            border: 1px solid var(--sv-border);
+            border-radius: 24px;
+            backdrop-filter: blur(24px);
+            max-height: calc(100vh - 120px);
+            position: sticky;
+            top: 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+    }
+
+    .syllabus-list {
+        overflow-y: auto;
+        padding: 0.5rem;
+    }
+
+    .syllabus-node {
+        display: block;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        border-radius: 14px;
+        text-decoration: none;
+        background: rgba(255,255,255,0.02);
+        color: var(--sv-muted);
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+
+    .syllabus-node:hover {
+        background: rgba(255,255,255,0.04);
+        color: #fff;
+    }
+
+    .syllabus-node.active {
+        background: rgba(168, 85, 247, 0.1);
+        border: 1px solid rgba(168, 85, 247, 0.3);
+        color: #fff;
+    }
+
+    /* ==========================================================================
+       7. NOTIFICACIONES IN-APP (TOASTS)
+       ========================================================================== */
+    #systemToast {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid var(--sv-accent);
+        color: #fff;
+        padding: 0.85rem 1.75rem;
+        border-radius: 100px;
+        font-family: monospace;
+        font-size: 0.95rem;
+        font-weight: bold;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.8), 0 0 20px rgba(56, 189, 248, 0.3);
+        z-index: 9999;
+        opacity: 0;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        pointer-events: none;
+        white-space: nowrap;
+    }
+
+    #systemToast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+</style>
+
+<div class="master-container">
+
+    <!-- 1. TOPBAR STICKY -->
+    <div class="nav-glass d-flex justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-3 min-w-0">
+            <a href="{% url 'student_classes_hub' %}" class="btn btn-dark border border-secondary rounded-circle d-flex justify-content-center align-items-center flex-shrink-0" style="width: 42px; height: 42px; background: #0f172a;">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="d-flex flex-column min-w-0">
+                <span class="badge rounded-pill font-monospace align-self-start mb-1 px-2 py-1" style="background: rgba(168, 85, 247, 0.15); color: var(--sv-purple); border: 1px solid rgba(168, 85, 247, 0.4);">
+                    {{ current_class.get_subject_display }}
+                </span>
+                <span class="fw-bold text-white small text-truncate" style="max-width: 250px; line-height: 1.2;">
+                    {{ current_class.title }}
+                </span>
+            </div>
+        </div>
+        <button type="button" onclick="window.togglePlayerFullscreen()" class="btn btn-outline-light rounded-pill px-3 py-2 d-inline-flex align-items-center gap-2">
+            <i class="fas fa-expand"></i>
+            <span class="d-none d-md-inline font-monospace fw-bold" style="font-size: 0.85rem;">Pantalla Completa</span>
+        </button>
+    </div>
+
+    <!-- 2. GRID MATRIZ -->
+    <div class="row g-0 g-xl-4">
+        
+        <!-- COLUMNA PRINCIPAL -->
+        <div class="col-12 col-xl-8 col-xxl-9">
+            
+            <!-- REPRODUCTOR -->
+            <div class="video-card mb-0 mb-xl-4" id="videoBoxWrapper">
+                <div class="video-ratio-box">
+                    <video id="theaterVideo" class="native-cinema-video" controls playsinline preload="auto">
+                        <source src="{{ current_class.video_url }}" type="video/mp4">
+                        Tu navegador no soporta video HTML5.
+                    </video>
+                </div>
+
+                <!-- METADATA Y CONTROLES -->
+                <div class="action-console">
+                    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                        <span class="badge bg-white text-dark font-monospace fw-bold px-2 py-1 rounded-2">Lec #{{ current_class.order }}</span>
+                        <h4 class="fw-black text-white mb-0 text-truncate" style="letter-spacing: -0.5px;">{{ current_class.title }}</h4>
+                    </div>
+                    <p class="text-white-50 small mb-4 font-sans" style="line-height: 1.6; max-width: 850px;">{{ current_class.description }}</p>
+                    
+                    <!-- CONTROLES (VELOCIDAD + LIKE) -->
+                    <div class="controls-wrapper">
+                        <!-- VELOCÍMETRO -->
+                        <div class="speed-segment-scroll">
+                            <div class="speed-segment-control">
+                                <button id="spd-1" type="button" class="speed-segment-btn active" onclick="window.changePlaybackSpeed(1, 'spd-1')">1x</button>
+                                <button id="spd-125" type="button" class="speed-segment-btn" onclick="window.changePlaybackSpeed(1.25, 'spd-125')">1.25x</button>
+                                <button id="spd-15" type="button" class="speed-segment-btn" onclick="window.changePlaybackSpeed(1.5, 'spd-15')">1.5x</button>
+                                <button id="spd-2" type="button" class="speed-segment-btn" onclick="window.changePlaybackSpeed(2, 'spd-2')">2x</button>
+                            </div>
+                        </div>
+
+                        <!-- LIKE -->
+                        <button type="button" id="mainLikeBtn" onclick="window.toggleLike()" class="btn-neural-like {% if user_has_liked %}liked{% endif %}">
+                            <i class="fas fa-heart fs-6"></i>
+                            <span class="fw-bold font-monospace">
+                                <span id="mainLikeCounter">{{ total_likes|default:"0" }}</span> Likes
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FORO Y PREGUNTAS -->
+            <div class="forum-container mt-3 mt-xl-0 mb-4 mb-xl-0">
+                <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3);">
+                            <i class="fas fa-comments fs-4" style="color: var(--sv-purple);"></i>
+                        </div>
+                        <div>
+                            <h4 class="fw-bold text-white mb-0">Foro de la Clase</h4>
+                            <span class="text-white-50 font-monospace small">Aportes y discusión en tiempo real</span>
+                        </div>
+                    </div>
+                    <span class="badge rounded-pill font-monospace border border-secondary text-white-50 px-3 py-2 fs-6" id="commentCounterBadge">
+                        {{ comments|length }} Respuestas
+                    </span>
+                </div>
+
+                <!-- ÁREA DE INPUT 100% ASÍNCRONA (SIN ETIQUETA FORM) -->
+                <div class="mb-5" id="commentWrapper">
+                    {% csrf_token %}
+                    <div class="cyber-textarea-wrapper">
+                        <textarea id="commentInput"
+                                  rows="2"
+                                  maxlength="1200"
+                                  class="form-control text-white border-0 bg-transparent shadow-none font-monospace p-3"
+                                  style="resize: none; font-size: 0.95rem; min-height: 85px;"
+                                  placeholder="¿Tienes alguna duda sobre este tema? Escríbela aquí..."
+                                  oninput="this.style.height = '';this.style.height = this.scrollHeight + 'px'"></textarea>
+                        
+                        <div class="d-flex flex-wrap justify-content-between align-items-center p-2 border-top border-secondary border-opacity-25 gap-2 mt-2">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <button type="button" onclick="window.captureLiveTimestamp()" class="btn btn-dark border-secondary btn-sm rounded-pill font-monospace text-info d-flex align-items-center gap-2 px-3 py-2">
+                                    <i class="fas fa-stopwatch"></i>
+                                    <span>Vincular <span id="timestampLivePreview">00:00</span></span>
+                                </button>
+                                <input type="hidden" id="attachedTimestamp" value="">
+                                <span id="tsAttachedTag" class="badge bg-info text-dark rounded-pill font-monospace d-none px-2 py-2" style="font-size: 0.75rem;">
+                                    Minuto Enlazado <i class="fas fa-times ms-1" style="cursor: pointer;" onclick="window.clearLiveTimestamp()"></i>
+                                </span>
+                            </div>
+                            
+                            <button type="button" id="submitCommentBtn" onclick="window.publishComment()" class="btn btn-sm rounded-pill px-4 py-2 fw-black text-white d-inline-flex align-items-center gap-2" style="background: var(--sv-purple); box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);">
+                                <i class="fas fa-paper-plane"></i>
+                                <span style="font-size: 0.9rem;">Publicar</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FEED DE COMENTARIOS -->
+                <div class="d-flex flex-column gap-3" id="commentsFeed">
+                    {% for c in comments %}
+                    <div class="comment-card" id="comment-{{ c.id }}">
+                        <div class="d-flex justify-content-between align-items-start mb-3 gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-black font-monospace flex-shrink-0 shadow-sm" style="width: 44px; height: 44px; background: linear-gradient(135deg, #7c3aed 0%, #38bdf8 100%); font-size: 1.1rem;">
+                                    {{ c.user.username|slice:":1"|upper }}
+                                </div>
+                                <div class="d-flex flex-column">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span class="fw-bold text-white font-monospace">{{ c.user.get_full_name|default:c.user.username }}</span>
+                                        {% if c.video_timestamp is not None %}
+                                        <span class="ts-pill font-monospace" onclick="window.jumpToSeconds({{ c.video_timestamp }})" title="Reproducir desde este punto">
+                                            <i class="fas fa-play" style="font-size: 0.6rem;"></i>{{ c.formatted_timestamp }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-white-50 font-monospace mt-1" style="font-size: 0.75rem;">{{ c.created_at|date:"d M, H:i" }}</small>
+                                </div>
+                            </div>
+                            {% if request.user.perfil.rol == 'ADMIN' %}
+                            <button type="button" onclick="window.deleteComment({{ c.id }})" class="btn-purgar" title="Eliminar aporte">
+                                <i class="fas fa-trash-alt fs-6"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                        <p class="text-light mb-0 ps-0 ps-md-5 ms-md-3 font-sans" style="line-height: 1.6; white-space: pre-wrap; font-size: 0.98rem;">{{ c.content }}</p>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-5 text-white-50 rounded-4 font-monospace" id="noCommentsBox" style="background: rgba(2, 6, 23, 0.5); border: 1px dashed rgba(255,255,255,0.1);">
+                        <i class="far fa-comment-dots fs-1 mb-3 d-block opacity-25"></i>
+                        <span class="d-block mb-1 fw-bold text-white opacity-75">El foro está vacío</span>
+                        <small>Sé el primero en aportar a esta lección.</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- COLUMNA SYLLABUS -->
+        <div class="col-12 col-xl-4 col-xxl-3 mt-0 mt-xl-0">
+            <div class="syllabus-wrapper">
+                <div class="p-4 border-bottom border-secondary border-opacity-25 d-flex justify-content-between align-items-center rounded-top-4" style="background: rgba(2, 6, 23, 0.5);">
+                    <h6 class="fw-black text-white mb-0 font-monospace small text-uppercase tracking-widest">Syllabus</h6>
+                    <span class="badge bg-dark border border-secondary text-muted font-monospace px-2 py-1">{{ playlist|length }} Lec</span>
+                </div>
+                <div class="syllabus-list flex-grow-1 p-2">
+                    {% for item in playlist %}
+                    <a href="{% url 'class_player_view' item.uuid %}" class="syllabus-node {% if item.uuid == current_class.uuid %}active{% endif %}">
+                        <div class="d-flex flex-column gap-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge rounded-pill font-monospace px-2" style="font-size: 0.65rem; background: rgba(255,255,255,0.1); color: #cbd5e1;">
+                                    Lec #{{ item.order }}
+                                </span>
+                                <small class="font-monospace fw-bold" style="font-size: 0.75rem; color: var(--sv-purple);">{{ item.duration_minutes }}m</small>
+                            </div>
+                            <span class="small fw-bold lh-sm {% if item.uuid == current_class.uuid %}text-white{% else %}text-white-50{% endif %}">
+                                {{ item.title }}
+                            </span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST FLOTANTE -->
+<div id="systemToast">
+    <i class="fas fa-check-circle me-2 text-cyan"></i> <span id="toastMsg">Acción completada</span>
+</div>
+
+<!-- JAVASCRIPT SCOPE GLOBAL SEGURO -->
+<script>
+    const isAdminUser = {% if request.user.perfil.rol == 'ADMIN' %}true{% else %}false{% endif %};
+    const toastElem = document.getElementById('systemToast');
+    const toastText = document.getElementById('toastMsg');
+
+    // Inicializador Seguro del Video
+    function getVideoElement() {
+        return document.getElementById('theaterVideo');
+    }
+
+    // Toast Engine
+    window.launchToast = function(msg, isError = false) {
+        toastText.textContent = msg;
+        toastElem.style.borderColor = isError ? 'var(--sv-rose)' : 'var(--sv-cyan)';
+        toastElem.querySelector('i').className = isError ? 'fas fa-exclamation-circle me-2 text-rose' : 'fas fa-check-circle me-2 text-cyan';
+        toastElem.classList.add('show');
+        setTimeout(() => toastElem.classList.remove('show'), 3500);
+    };
+
+    // CSRF Seguro
+    window.extractCsrf = function() {
+        let cookieVal = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const c = cookies[i].trim();
+                if (c.substring(0, 10) === ('csrftoken=')) {
+                    cookieVal = decodeURIComponent(c.substring(10));
+                    break;
+                }
+            }
+        }
+        return cookieVal || (document.querySelector('[name=csrfmiddlewaretoken]')?.value);
+    };
+
+    // Tracker de Minutos en Vivo
+    document.addEventListener('DOMContentLoaded', () => {
+        const vid = getVideoElement();
+        if (vid) {
+            vid.addEventListener('timeupdate', () => {
+                const cur = Math.floor(vid.currentTime);
+                const m = String(Math.floor(cur / 60)).padStart(2, '0');
+                const s = String(cur % 60).padStart(2, '0');
+                const preview = document.getElementById('timestampLivePreview');
+                if (preview) preview.textContent = `${m}:${s}`;
+            });
+        }
+    });
+
+    window.captureLiveTimestamp = function() {
+        const vid = getVideoElement();
+        if (!vid) return;
+        document.getElementById('attachedTimestamp').value = Math.floor(vid.currentTime);
+        document.getElementById('tsAttachedTag').classList.remove('d-none');
+    };
+
+    window.clearLiveTimestamp = function() {
+        document.getElementById('attachedTimestamp').value = '';
+        document.getElementById('tsAttachedTag').classList.add('d-none');
+    };
+
+    window.jumpToSeconds = function(sec) {
+        const vid = getVideoElement();
+        if (!vid) return;
+        vid.currentTime = sec;
+        vid.play().catch(() => {});
+        vid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    // CONTROL DE VELOCIDAD ROBUSTO
+    window.changePlaybackSpeed = function(rate, btnId) {
+        const vid = getVideoElement();
+        if (vid) {
+            vid.playbackRate = parseFloat(rate);
+        }
+        
+        // UI Actualización
+        document.querySelectorAll('.speed-segment-btn').forEach(b => b.classList.remove('active'));
+        const activeBtn = document.getElementById(btnId);
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+        }
+    };
+
+    window.togglePlayerFullscreen = function() {
+        const vid = getVideoElement();
+        const box = document.getElementById('videoBoxWrapper') || vid;
+        if (!document.fullscreenElement) {
+            box.requestFullscreen ? box.requestFullscreen() : box.webkitRequestFullscreen();
+        } else {
+            document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen();
+        }
+    };
+
+    // LIKES
+    window.toggleLike = async function() {
+        const btn = document.getElementById('mainLikeBtn');
+        const counter = document.getElementById('mainLikeCounter');
+        
+        try {
+            const res = await fetch("{% url 'api_toggle_class_like' current_class.uuid %}", {
+                method: 'POST',
+                headers: { 'X-CSRFToken': window.extractCsrf(), 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (counter) counter.textContent = data.total_likes;
+                data.liked ? btn.classList.add('liked') : btn.classList.remove('liked');
+            }
+        } catch (err) {
+            window.launchToast("Error de conexión", true);
+        }
+    };
+
+    // PUBLICACIÓN PÚRA (CERO RECARGAS DOM)
+    window.publishComment = async function() {
+        const input = document.getElementById('commentInput');
+        const content = input.value.trim();
+        
+        if (!content) {
+            window.launchToast("El aporte no puede estar vacío", true);
+            input.focus();
+            return;
+        }
+
+        const btn = document.getElementById('submitCommentBtn');
+        btn.disabled = true;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
+
+        const token = window.extractCsrf();
+        const formData = new FormData();
+        formData.append('content', content);
+        
+        const attachedTs = document.getElementById('attachedTimestamp').value;
+        if (attachedTs) formData.append('timestamp', attachedTs);
+
+        try {
+            const res = await fetch("{% url 'api_add_class_comment' current_class.uuid %}", {
+                method: 'POST',
+                headers: { 'X-CSRFToken': token },
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                const noCommentsBox = document.getElementById('noCommentsBox');
+                if (noCommentsBox) noCommentsBox.remove();
+
+                const c = data.comment;
+                const tsTag = c.timestamp ? `
+                    <span class="ts-pill font-monospace" onclick="window.jumpToSeconds(${c.raw_seconds})" title="Reproducir">
+                        <i class="fas fa-play" style="font-size: 0.6rem;"></i>${c.timestamp}
+                    </span>` : '';
+                
+                const deleteBtn = isAdminUser ? `
+                    <button type="button" onclick="window.deleteComment(${c.id})" class="btn-purgar" title="Eliminar aporte">
+                        <i class="fas fa-trash-alt fs-6"></i>
+                    </button>` : '';
+
+                const newCardHtml = `
+                    <div class="comment-card animate__animated animate__fadeInDown" id="comment-${c.id}">
+                        <div class="d-flex justify-content-between align-items-start mb-3 gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-black font-monospace flex-shrink-0 shadow-sm" style="width: 44px; height: 44px; background: linear-gradient(135deg, #7c3aed 0%, #38bdf8 100%); font-size: 1.1rem;">
+                                    ${c.author_initial}
+                                </div>
+                                <div class="d-flex flex-column">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span class="fw-bold text-white font-monospace">${c.author}</span>
+                                        ${tsTag}
+                                    </div>
+                                    <small class="text-white-50 font-monospace mt-1" style="font-size: 0.75rem;">${c.created_at}</small>
+                                </div>
+                            </div>
+                            ${deleteBtn}
+                        </div>
+                        <p class="text-light mb-0 ps-0 ps-md-5 ms-md-3 font-sans" style="line-height: 1.6; white-space: pre-wrap; font-size: 0.98rem;">${c.content}</p>
+                    </div>
+                `;
+
+                document.getElementById('commentsFeed').insertAdjacentHTML('afterbegin', newCardHtml);
+                document.getElementById('commentCounterBadge').textContent = `${data.total_comments} Respuestas`;
+                
+                input.value = '';
+                input.style.height = ''; 
+                window.clearLiveTimestamp();
+                window.launchToast("Aporte publicado con éxito");
+            } else {
+                window.launchToast(data.error || "No se pudo publicar", true);
+            }
+        } catch (err) {
+            window.launchToast("Fallo de red al publicar", true);
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    };
+
+    // ELIMINAR (SOLO ADMIN)
+    window.deleteComment = async function(id) {
+        if (!confirm('¿Purgar este comentario de la matriz? Es irreversible.')) return;
+        
+        try {
+            const res = await fetch(`/api/clases/comentario/${id}/eliminar/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': window.extractCsrf() }
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                const bubble = document.getElementById(`comment-${id}`);
+                bubble.style.transition = 'all 0.25s ease';
+                bubble.style.opacity = '0';
+                bubble.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    bubble.remove();
+                    document.getElementById('commentCounterBadge').textContent = `${data.total_comments} Respuestas`;
+                    if (data.total_comments === 0) location.reload();
+                }, 250);
+                window.launchToast("Aporte eliminado");
+            }
+        } catch (err) {
+            window.launchToast("Error al purgar", true);
+        }
+    };
+</script>
+{% endblock %}

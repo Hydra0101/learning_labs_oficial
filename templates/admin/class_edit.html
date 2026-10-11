@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 900px;">
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <a href="{% url 'admin_classes_dashboard' %}" class="btn btn-dark border-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+            <i class="fas fa-arrow-left text-white"></i>
+        </a>
+        <div>
+            <h4 class="fw-bold text-white mb-0">Editar Clase: {{ master_class.title }}</h4>
+            <span class="badge rounded-pill font-monospace" style="background: rgba(168, 85, 247, 0.2); color: #c084fc;">
+                {{ master_class.get_subject_display }} #{{ master_class.order }}
+            </span>
+        </div>
+    </div>
+
+    <div class="card border-0 rounded-4 p-4 shadow" style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.08) !important;">
+        <form method="POST">
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-12 col-md-8">
+                    <label class="form-label font-monospace small text-white-50">Título de la Lección</label>
+                    {{ form.title }}
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label font-monospace small text-white-50">Materia</label>
+                    {{ form.subject }}
+                </div>
+                <div class="col-6 col-md-4">
+                    <label class="form-label font-monospace small text-white-50">Orden / Lección #</label>
+                    {{ form.order }}
+                </div>
+                <div class="col-6 col-md-4">
+                    <label class="form-label font-monospace small text-white-50">Duración (Minutos)</label>
+                    {{ form.duration_minutes }}
+                </div>
+                <div class="col-12 col-md-4 d-flex align-items-end">
+                    <div class="form-check form-switch mb-2">
+                        {{ form.is_active }}
+                        <label class="form-check-label font-monospace small text-white">Clase Activa</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label font-monospace small text-white-50">URL del Video (MP4 / R2 CDN)</label>
+                    {{ form.video_url }}
+                </div>
+                <div class="col-12">
+                    <label class="form-label font-monospace small text-white-50">Descripción Pedagógica</label>
+                    {{ form.description }}
+                </div>
+                <div class="col-12 d-flex justify-content-end gap-2 mt-4">
+                    <a href="{% url 'admin_classes_dashboard' %}" class="btn btn-outline-light rounded-pill px-4 font-monospace">Cancelar</a>
+                    <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold font-monospace" style="background: #a855f7; border-color: #a855f7;">Actualizar Cambios</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

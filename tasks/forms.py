@@ -9,13 +9,19 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import update_session_auth_hash
 from django.core.exceptions import ValidationError
+from django.utils.html import strip_tags
+from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
+import unicodedata
+from urllib.parse import urlparse
+from .models import Simulator, MasterClass
 
 # Importamos TODOS los modelos necesarios
+
 from .models import (
     Question, Answer, ROLES_CHOICES, Observacion, Periodo, Matricula,
     MensajeInterno, Acudiente, Curso, AsignacionMateria,
-    Post, Comment, SocialGroup, Perfil, Seguimiento  # Aseguramos Perfil
+    Post, Comment, SocialGroup, Perfil, Seguimiento, MasterClass  # Aseguramos Perfil
 )
 
 # Definición del modelo User de forma segura
@@ -752,4 +758,248 @@ class TelefonoAcudienteForm(forms.ModelForm):
                 'class': 'form-check-input',
                 'style': 'cursor: pointer;'
             })
+        }
+
+def sanitize_text_input(raw_value: str, max_chars: int) -> str:
+    """
+    Saneamiento de texto O(N) a nivel de bajo nivel:
+    1. Normalización Unicode canónica NFKC (desactiva homógrafos y zero-width bypasses).
+    2. Eliminación de Null Bytes (\x00) para evitar truncamiento en bindings de libpq (C).
+    3. Strip tags para neutralizar vectores XSS almacenados.
+    4. Limpieza de caracteres de control ASCII (0x00 - 0x1F, excepto saltos de línea permitidos).
+    """
+    if not raw_value:
+        return ""
+
+    # Normalización canónica (CPython C-speed)
+    normalized = unicodedata.normalize('NFKC', str(raw_value))
+
+    # Eliminación de Null-bytes críticos
+    sanitized = normalized.replace('\x00', '')
+
+    # Eliminación estricta de tags HTML
+    sanitized = strip_tags(sanitized)
+
+    # Filtrar caracteres de control maliciosos conservando saltos de línea estándar
+    sanitized = "".join(
+        ch for ch in sanitized
+        if ch in ('\n', '\r') or not unicodedata.category(ch).startswith('C')
+    )
+
+    return sanitized.strip()[:max_chars]
+
+
+class SimulatorForm(forms.ModelForm):
+    """
+    Formulario de alto rendimiento y defensa en profundidad.
+    Garantiza integridad de datos, saneamiento de strings contra ataques de inyección,
+    validación de colisiones de URL idempotente y atributos semánticos para WCAG 2.1 AA.
+    """
+
+    class Meta:
+        model = Simulator
+        fields = ['title', 'subject', 'description', 'url', 'order', 'is_active']
+        widgets = {
+            'title': forms.TextInput(attrs={
+                'class': 'form-control rounded-3 shadow-none',
+                'placeholder': 'Ej. 2.2 Estructura subatómica: Protones y Neutrones',
+                'autocomplete': 'off',
+                'maxlength': '200',
+                'aria-required': 'true',
+                'aria-label': 'Título del simulador',
+                'spellcheck': 'true',
+            }),
+            'subject': forms.Select(attrs={
+                'class': 'form-select rounded-3 shadow-none',
+                'aria-required': 'true',
+                'aria-label': 'Materia o disciplina académica',
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control rounded-3 shadow-none',
+                'rows': 3,
+                'placeholder': 'Descripción didáctica y objetivos de aprendizaje del applet...',
+                'maxlength': '1500',
+                'aria-required': 'true',
+                'aria-label': 'Descripción pedagógica',
+                'spellcheck': 'true',
+            }),
+            'url': forms.URLInput(attrs={
+                'class': 'form-control rounded-3 shadow-none font-monospace',
+                'placeholder': 'https://ai.studio/apps/...',
+                'autocomplete': 'off',
+                'autocapitalize': 'none',
+                'inputmode': 'url',
+                'spellcheck': 'false',
+                'aria-required': 'true',
+                'aria-label': 'URL segura HTTPS del simulador',
+            }),
+            'order': forms.NumberInput(attrs={
+                'class': 'form-control rounded-3 shadow-none font-monospace',
+                'min': '0',
+                'max': '32767',
+                'placeholder': '0',
+                'inputmode': 'numeric',
+                'aria-label': 'Orden secuencial de aparición',
+            }),
+            'is_active': forms.CheckboxInput(attrs={
+                'class': 'form-check-input ms-2 cursor-pointer',
+                'role': 'switch',
+                'aria-label': 'Activar visibilidad para estudiantes',
+            }),
+        }
+
+    def clean_title(self) -> str:
+        raw_title = self.cleaned_data.get('title', '')
+        clean_title = sanitize_text_input(raw_title, max_chars=200)
+
+        if len(clean_title) < 3:
+            raise ValidationError(
+                _("El título debe contener al menos 3 caracteres alfanuméricos válidos."),
+                code='title_too_short'
+            )
+        return clean_title
+
+    def clean_description(self) -> str:
+        raw_desc = self.cleaned_data.get('description', '')
+        clean_desc = sanitize_text_input(raw_desc, max_chars=1500)
+
+        if len(clean_desc) < 5:
+            raise ValidationError(
+                _("La descripción didáctica debe contener al menos 5 caracteres descriptivos."),
+                code='description_too_short'
+            )
+        return clean_desc
+
+    def clean_url(self) -> str:
+        raw_url = self.cleaned_data.get('url', '').strip()
+
+        # Validación anti-CRLF (bloquea inyecciones de cabecera HTTP en proxies)
+        if any(c in raw_url for c in ('\r', '\n', '\t', '\x00')):
+            raise ValidationError(
+                _("La URL contiene caracteres de control o saltos de línea prohibidos."),
+                code='crlf_detected'
+            )
+
+        parsed = urlparse(raw_url)
+        if parsed.scheme.lower() != 'https':
+            raise ValidationError(
+                _("Protocolo inseguro. Solo se permiten recursos bajo HTTPS estricto."),
+                code='insecure_scheme'
+            )
+
+        if not parsed.netloc:
+            raise ValidationError(
+                _("La URL carece de un Fully Qualified Domain Name (FQDN) válido."),
+                code='invalid_fqdn'
+            )
+
+        # Validación de idempotencia / colisión de URL en base de datos
+        query = Simulator.objects.filter(url=raw_url)
+        if self.instance and self.instance.pk:
+            query = query.exclude(pk=self.instance.pk)
+
+        if query.exists():
+            raise ValidationError(
+                _("Ya existe un simulador registrado con esta misma URL."),
+                code='duplicate_url'
+            )
+
+        return raw_url
+
+    def clean_order(self) -> int:
+        order = self.cleaned_data.get('order')
+        if order is None or order < 0:
+            return 0
+        if order > 32767:
+            raise ValidationError(
+                _("El valor de orden excede el límite permitido de base de datos (SmallInt: 32767)."),
+                code='order_overflow'
+            )
+        return order
+
+
+
+
+
+class MasterClassForm(forms.ModelForm):
+    class Meta:
+        model = MasterClass
+        fields = [
+            'title',
+            'subject',
+            'description',
+            'video_url',
+            'duration_minutes',
+            'order',
+            'is_active',
+        ]
+        widgets = {
+            'title': forms.TextInput(attrs={
+                'class': 'form-control rounded-3',
+                'placeholder': 'Ej. 1.3 Propiedades de la materia: Físicas y Químicas'
+            }),
+            'subject': forms.Select(attrs={
+                'class': 'form-select rounded-3'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control rounded-3',
+                'rows': 3,
+                'placeholder': 'Sintetiza los objetivos conceptuales y competencias clave...'
+            }),
+            'video_url': forms.URLInput(attrs={
+                'class': 'form-control rounded-3',
+                'placeholder': 'https://pub-46cdb180c9f64bb48ed13753c8e88943.r2.dev/...'
+            }),
+            'duration_minutes': forms.NumberInput(attrs={
+                'class': 'form-control rounded-3',
+                'min': 1
+            }),
+            'order': forms.NumberInput(attrs={
+                'class': 'form-control rounded-3',
+                'min': 1
+            }),
+            'is_active': forms.CheckboxInput(attrs={
+                'class': 'form-check-input ms-2'
+            }),
+        }
+
+    def clean_video_url(self):
+        url = self.cleaned_data.get('video_url', '').strip()
+        if not url.startswith('https://'):
+            raise forms.ValidationError("Por políticas de AppSec, el video debe servirse estrictamente vía HTTPS.")
+        return url
+
+
+class MasterClassForm(forms.ModelForm):
+    class Meta:
+        model = MasterClass
+        fields = ['title', 'subject', 'order', 'video_url', 'duration_minutes', 'description', 'is_active']
+        widgets = {
+            'title': forms.TextInput(attrs={
+                'class': 'form-control bg-dark text-white border-secondary rounded-3 font-monospace',
+                'placeholder': 'Ej: 2.5 Arquitectura de la Tabla Periódica'
+            }),
+            'subject': forms.Select(attrs={
+                'class': 'form-select bg-dark text-white border-secondary rounded-3 font-monospace'
+            }),
+            'order': forms.NumberInput(attrs={
+                'class': 'form-control bg-dark text-white border-secondary rounded-3 font-monospace',
+                'placeholder': '1, 2, 3...'
+            }),
+            'video_url': forms.URLInput(attrs={
+                'class': 'form-control bg-dark text-white border-secondary rounded-3 font-monospace',
+                'placeholder': 'https://pub-xxxxxx.r2.dev/clase_quimica_01.mp4'
+            }),
+            'duration_minutes': forms.NumberInput(attrs={
+                'class': 'form-control bg-dark text-white border-secondary rounded-3 font-monospace',
+                'placeholder': '45'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control bg-dark text-white border-secondary rounded-3 font-monospace',
+                'rows': 3,
+                'placeholder': 'Descripción pedagógica, objetivos de aprendizaje y conceptos clave...'
+            }),
+            'is_active': forms.CheckboxInput(attrs={
+                'class': 'form-check-input bg-dark border-secondary'
+            }),
         }

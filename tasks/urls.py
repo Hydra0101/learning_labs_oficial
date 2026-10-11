@@ -484,6 +484,33 @@ urlpatterns = [
     path('laboratorios/', include('tasks.urls_simuladores')),
     path('laboratorios/raw/<slug:slug>/', views_simuladores.render_raw_simulador, name='render_raw'),
     path('admin-fenix/', include('tasks.urls_admin_simuladores')),
+    path('estudiante/simuladores/', views.student_simulators_hub, name='student_simulators_hub'),
+    path('estudiante/simuladores/<uuid:simulator_uuid>/ver/', views.simulator_viewer, name='simulator_viewer'),
 
+    # ======================================================
+    # GESTIÓN Y CARGA DE SIMULADORES (ADMINISTRADORES)
+    # ======================================================
+    path('panel/simuladores/', views.admin_simulators_list, name='admin_simulators_list'),
+    path('panel/simuladores/<uuid:simulator_uuid>/eliminar/', views.admin_simulator_delete, name='admin_simulator_delete'),
+    # ======================================================
+    # HUB DE CLASES MAGISTRALES (ESTUDIANTES)
+    # ======================================================
+    path('estudiante/clases/', views.student_classes_hub, name='student_classes_hub'),
+    path('estudiante/clases/<uuid:class_uuid>/ver/', views.class_player_view, name='class_player_view'),
+
+    # ======================================================
+    # GESTIÓN INSTITUCIONAL DE CLASES (ADMINISTRADORES)
+    # ======================================================
+    path('panel/clases/', views.admin_classes_manage, name='admin_classes_manage'),
+    path('panel/clases/<uuid:class_uuid>/eliminar/', views.admin_class_delete, name='admin_class_delete'),
+    # INTERACCIÓN SOCIAL ASÍNCRONA (LIKES & COMMENTS)
+    path('api/clases/<uuid:class_uuid>/like/', views.api_toggle_class_like, name='api_toggle_class_like'),
+    path('api/clases/<uuid:class_uuid>/comentar/', views.api_add_class_comment, name='api_add_class_comment'),
+    path('api/clases/comentario/<int:comment_id>/eliminar/', views.api_delete_class_comment, name='api_delete_class_comment'),
+    path('clases/', views.admin_classes_dashboard, name='admin_classes_dashboard'),
+    path('clases/crear/', views.admin_class_create, name='admin_class_create'),
+    path('clases/<uuid:class_uuid>/editar/', views.admin_class_edit, name='admin_class_edit'),
+    path('clases/<uuid:class_uuid>/eliminar/', views.admin_class_delete, name='admin_class_delete'),
+    path('panel/toggle-restriccion/<int:user_id>/', views.toggle_restriccion_usuario, name='toggle_restriccion_usuario'),
 
 ]

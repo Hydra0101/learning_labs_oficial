@@ -1,0 +1,275 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    :root {
+        --hud-bg: rgba(11, 15, 25, 0.95);
+        --hud-border: rgba(255, 255, 255, 0.12);
+        --hud-cyan: #38bdf8;
+        --hud-cyan-glow: rgba(56, 189, 248, 0.3);
+    }
+
+    .quantum-viewer-container {
+        background-color: #05070d;
+        color: #f8fafc;
+        min-height: calc(100vh - 75px);
+        display: flex;
+        flex-direction: column;
+        position: relative;
+    }
+
+    .lab-control-hud {
+        background: var(--hud-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--hud-border);
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        z-index: 30;
+    }
+
+    .sandbox-viewport-wrapper {
+        flex: 1 1 auto;
+        width: 100%;
+        min-height: 75vh;
+        background: #000000;
+        border: 1px solid var(--hud-border);
+        border-radius: 20px;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+    }
+
+    .sandbox-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 5;
+    }
+
+    /* Tarjeta de Estación Inmersiva cuando Google bloquea el frame */
+    .station-hub-card {
+        background: radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.15) 0%, rgba(15, 23, 42, 0.95) 75%);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        box-shadow: 0 0 50px rgba(56, 189, 248, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        max-width: 680px;
+        z-index: 15;
+    }
+
+    .quantum-loader-overlay {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 25;
+        transition: opacity 0.4s ease, visibility 0.4s ease;
+    }
+
+    .atom-spinner {
+        width: 56px;
+        height: 56px;
+        border: 3px solid rgba(56, 189, 248, 0.2);
+        border-top-color: var(--hud-cyan);
+        border-radius: 50%;
+        animation: spin-anim 0.9s linear infinite;
+        box-shadow: 0 0 25px var(--hud-cyan-glow);
+    }
+
+    @keyframes spin-anim {
+        to { transform: rotate(360deg); }
+    }
+
+    .btn-launch-immersive {
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        color: #ffffff;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 0 25px rgba(14, 165, 233, 0.4);
+        transition: all 0.25s ease;
+    }
+    .btn-launch-immersive:hover {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        color: #ffffff;
+        transform: scale(1.03);
+        box-shadow: 0 0 35px rgba(14, 165, 233, 0.6);
+    }
+</style>
+
+<div class="container-fluid px-3 py-3 quantum-viewer-container">
+    
+    <!-- 1. HUD SUPERIOR -->
+    <div class="lab-control-hud py-2 px-3 px-md-4 mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-3">
+            <a href="{% url 'student_simulators_hub' %}" class="btn btn-outline-light btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-2">
+                <i class="fas fa-chevron-left" style="color: var(--hud-cyan);"></i>
+                <span class="d-none d-sm-inline">Hub de Laboratorios</span>
+            </a>
+            
+            <div class="d-flex align-items-center gap-2 border-start border-secondary border-opacity-25 ps-3">
+                <span class="badge bg-primary bg-opacity-20 rounded-pill font-monospace" style="color: var(--hud-cyan); border: 1px solid rgba(56, 189, 248, 0.3);">
+                    {{ simulator.get_subject_display }}
+                </span>
+                <span class="fw-bold text-white fs-6 d-none d-md-inline text-truncate" style="max-width: 320px;" title="{{ simulator.title }}">
+                    {{ simulator.title }}
+                </span>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 ms-auto">
+            <!-- Cronómetro de Práctica -->
+            <div class="px-3 py-1 rounded-pill d-none d-lg-flex align-items-center gap-2 small border border-secondary border-opacity-25 font-monospace bg-dark">
+                <i class="fas fa-stopwatch" style="color: var(--hud-cyan);"></i>
+                <span id="sessionTimer">00:00:00</span>
+            </div>
+
+            <!-- Botón de Ejecución en Ventana Inmersiva -->
+            <button onclick="launchAppletDedicated()" class="btn btn-outline-info btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-2">
+                <i class="fas fa-external-link-alt"></i>
+                <span class="d-none d-sm-inline">Ventana Dedicada</span>
+            </button>
+
+            <!-- Pantalla Completa Universal -->
+            <button onclick="toggleUniversalFullscreen()" class="btn btn-primary btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-2 fw-semibold">
+                <i class="fas fa-expand"></i>
+                <span class="d-none d-sm-inline">Pantalla Completa</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. CONTENEDOR HÍBRIDO VIEWPORT -->
+    <div class="sandbox-viewport-wrapper" id="sandboxContainer">
+        
+        <!-- Spinner Holográfico Temporal (Se oculta en max 1.8s) -->
+        <div class="quantum-loader-overlay" id="quantumLoader">
+            <div class="atom-spinner mb-3"></div>
+            <h6 class="fw-bold text-white mb-1 font-monospace tracking-wide">ESTABLECIENDO ENLACE CUÁNTICO</h6>
+            <small class="text-white-50 font-monospace" style="font-size: 0.75rem;">Sincronizando applet interactivo...</small>
+        </div>
+
+        <!-- Tarjeta de Estación Inmersiva (Aparece cuando el proveedor bloquea X-Frame-Options) -->
+        <div id="fallbackStation" class="station-hub-card p-4 p-md-5 rounded-4 text-center mx-3 my-4">
+            <div class="mb-3">
+                <i class="fas fa-atom fa-4x animate__animated animate__pulse animate__infinite" style="color: var(--hud-cyan);"></i>
+            </div>
+            <h3 class="fw-black text-white mb-2">{{ simulator.title }}</h3>
+            <p class="text-white-50 small mb-4" style="line-height: 1.65; max-width: 520px; margin: 0 auto;">
+                {{ simulator.description }}
+            </p>
+            
+            <div class="d-flex flex-column sm:flex-row justify-content-center gap-3">
+                <button onclick="launchAppletDedicated()" class="btn btn-launch-immersive rounded-pill px-5 py-3 fs-6 d-inline-flex align-items-center justify-content-center gap-2">
+                    <i class="fas fa-play"></i>
+                    <span>Iniciar Simulación Inmersiva</span>
+                </button>
+            </div>
+            
+            <div class="mt-4 pt-3 border-top border-secondary border-opacity-25 d-flex justify-content-center align-items-center gap-3 text-muted small font-monospace" style="font-size: 0.72rem;">
+                <span><i class="fas fa-shield-alt text-success me-1"></i> Sandbox Protegido</span>
+                <span>•</span>
+                <span><i class="fas fa-clock text-info me-1"></i> Telemetría Activa</span>
+            </div>
+        </div>
+
+        <!-- Iframe de respaldo directo -->
+        <iframe id="simFrame" 
+                src="{{ simulator.url }}" 
+                class="sandbox-iframe"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                allowfullscreen>
+        </iframe>
+    </div>
+
+</div>
+
+<!-- DECLARACIÓN GLOBAL DE FUNCIONES (INMUNE A CONFLICTOS DE DOM Y HTMX) -->
+<script>
+    // Variables de configuración de la simulación
+    const SIM_URL = "{{ simulator.url|escapejs }}";
+
+    // 1. Apertura de la Estación Inmersiva (Pop-up Maximizada sin salir de Learning Labs)
+    window.launchAppletDedicated = function() {
+        const w = Math.min(window.screen.availWidth * 0.95, 1400);
+        const h = Math.min(window.screen.availHeight * 0.92, 900);
+        const left = (window.screen.availWidth - w) / 2;
+        const top = (window.screen.availHeight - h) / 2;
+        
+        const win = window.open(
+            SIM_URL,
+            'LearningLabsSimulator',
+            `width=${w},height=${h},top=${top},left=${left},resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no`
+        );
+        if (win) {
+            win.focus();
+        } else {
+            // Si el bloqueador de popups del navegador interviene, abre en pestaña limpia
+            window.open(SIM_URL, '_blank', 'noopener,noreferrer');
+        }
+    };
+
+    // 2. Pantalla Completa Universal Cross-Browser
+    window.toggleUniversalFullscreen = function() {
+        const elem = document.getElementById('sandboxContainer') || document.documentElement;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(err => console.warn(err));
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            }
+        }
+    };
+
+    // 3. Manejo reactivo del Loader y detección de bloqueo de iframe
+    (function() {
+        const loader = document.getElementById('quantumLoader');
+        const simFrame = document.getElementById('simFrame');
+
+        // Retira el loader en máximo 1.8 segundos
+        setTimeout(() => {
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 400);
+            }
+        }, 1800);
+
+        if (simFrame) {
+            simFrame.addEventListener('load', () => {
+                if (loader) {
+                    loader.style.opacity = '0';
+                    setTimeout(() => loader.style.display = 'none', 300);
+                }
+            });
+        }
+    })();
+
+    // 4. Cronómetro de Telemetría Activa
+    (function() {
+        let sec = 0;
+        const timer = document.getElementById('sessionTimer');
+        setInterval(() => {
+            sec++;
+            const h = String(Math.floor(sec / 3600)).padStart(2, '0');
+            const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+            const s = String(sec % 60).padStart(2, '0');
+            if (timer) timer.textContent = `${h}:${m}:${s}`;
+        }, 1000);
+    })();
+</script>
+{% endblock %}

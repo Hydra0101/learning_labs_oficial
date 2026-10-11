@@ -3,7 +3,30 @@ from django.db.models import Avg, Count, Q, Min, Max
 import json
 from .models import Observacion, Institucion # <--- Importante importar Observacion
 from .models import Seguimiento # Asegúrate que importas tus modelos correctamente
+from .models import MasterClass
+from .forms import MasterClassForm
 from django.core.serializers.json import DjangoJSONEncoder
+from django.utils.html import escape
+from .models import Simulator
+from django.db.models import Count
+from .models import MasterClass, ClassLike, ClassComment
+
+from collections import defaultdict
+import logging
+import uuid
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db import DatabaseError, IntegrityError, transaction
+from django.http import Http404, HttpRequest, HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.clickjacking import xframe_options_exempt
+from django.views.decorators.http import require_http_methods, require_POST
+
+from .decorators import role_required
+from .forms import SimulatorForm
+from .models import Simulator
 
 import random
 import string
@@ -71,6 +94,7 @@ import csv
 import io
 import decimal
 import logging
+from .forms import SimulatorForm
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.views.decorators.http import require_POST
@@ -1628,20 +1652,46 @@ def asignar_materia_docente(request):
         # ---------------------------------------------------------
         # CASO B: CREAR MATERIA
         # ---------------------------------------------------------
+        # ---------------------------------------------------------
+        # CASO B: CREAR MATERIA EN MÚLTIPLES CURSOS
+        # ---------------------------------------------------------
         elif 'crear_materia' in request.POST:
-            nombre = request.POST.get('nombre')
-            curso_id = request.POST.get('curso_id')
+            nombre = request.POST.get('nombre', '').strip()
             
-            if nombre and curso_id:
+            # Soporta tanto checkboxes múltiples (cursos_ids) como selección única (curso_id)
+            cursos_ids = request.POST.getlist('cursos_ids')
+            if not cursos_ids:
+                single_id = request.POST.get('curso_id') or request.POST.get('cursos_ids')
+                if single_id:
+                    cursos_ids = [single_id]
+
+            print(f">>> [DEBUG] Creando materia: '{nombre}' | Cursos recibidos: {cursos_ids}")
+
+            if nombre and cursos_ids:
+                creadas = 0
+                existentes = 0
                 try:
-                    curso_obj = get_object_or_404(Curso, id=curso_id)
-                    Materia.objects.get_or_create(
-                        nombre=nombre.strip().title(),
-                        curso=curso_obj
-                    )
-                    messages.success(request, f'Materia "{nombre}" creada correctamente.')
+                    for c_id in cursos_ids:
+                        curso_obj = get_object_or_404(Curso, id=c_id)
+                        _, created = Materia.objects.get_or_create(
+                            nombre=nombre.title(),
+                            curso=curso_obj
+                        )
+                        if created:
+                            creadas += 1
+                        else:
+                            existentes += 1
+
+                    if creadas > 0:
+                        messages.success(request, f'Materia "{nombre.title()}" creada con éxito en {creadas} curso(s).')
+                    if existentes > 0:
+                        messages.info(request, f'La materia ya existía previamente en {existentes} curso(s).')
                 except Exception as e:
-                    messages.error(request, f'Error al crear materia: {e}')
+                    print(f">>> [ERROR] Fallo al crear materias: {e}")
+                    messages.error(request, f'Error al registrar materias: {e}')
+            else:
+                messages.warning(request, 'Debes ingresar el nombre de la materia y seleccionar al menos un curso.')
+
             return redirect('asignar_materia_docente')
 
         # ---------------------------------------------------------
@@ -2240,21 +2290,21 @@ def admin_eliminar_estudiante(request):
 
 @role_required('ADMINISTRADOR')
 def asignar_materia_docente(request):
-    # 1. CARGAR DOCENTES (Filtramos por rol DOCENTE o Director)
+    # 1. Cargar docentes, cursos y materias
     docentes = User.objects.filter(
         Q(perfil__rol='DOCENTE') | Q(perfil__es_director=True)
     ).select_related('perfil').order_by('first_name', 'last_name').distinct()
-    
+  
     cursos = Curso.objects.filter(activo=True).order_by('grado', 'seccion')
     materias = Materia.objects.all().select_related('curso').order_by('nombre')
-    
+  
     asignaciones = AsignacionMateria.objects.filter(activo=True).select_related(
         'materia', 'curso', 'docente'
     ).order_by('curso__grado', 'curso__seccion', 'materia__nombre')
 
     if request.method == 'POST':
-        
-        # 🟢 ACCIÓN 1: CREAR NUEVO DOCENTE (Lógica Blindada)
+      
+        # 🟢 ACCIÓN 1: CREAR NUEVO DOCENTE
         if 'crear_profesor' in request.POST:
             username = request.POST.get('username', '').strip().lower()
             first_name = request.POST.get('first_name', '').strip().title()
@@ -2264,72 +2314,102 @@ def asignar_materia_docente(request):
             if User.objects.filter(username=username).exists():
                 messages.error(request, f"El usuario '{username}' ya existe.")
                 return redirect('asignar_materia_docente')
-
             try:
                 with transaction.atomic():
-                    # 1. Crear Usuario
                     user = User.objects.create_user(
-                        username=username, 
-                        first_name=first_name, 
+                        username=username,
+                        first_name=first_name,
                         last_name=last_name,
-                        email=email, 
+                        email=email,
                         password=DEFAULT_TEMP_PASSWORD
                     )
-                    
-                    # 2. Gestionar Perfil (FORZANDO EL ROL)
-                    # Intentamos obtener el perfil (por si una señal lo creó) o crearlo
+                  
                     perfil, created = Perfil.objects.get_or_create(user=user)
-                    
-                    # Forzamos los valores SÍ o SÍ, y guardamos explícitamente
                     perfil.rol = 'DOCENTE'
                     perfil.requiere_cambio_clave = True
-                    perfil.save() # Guardado explícito para asegurar el cambio
-                    
+                    perfil.save()
+                  
                     messages.success(request, f'Docente "{first_name} {last_name}" registrado correctamente. (Usuario: {username})')
-            
+          
             except IntegrityError:
                 messages.error(request, "Error: El correo electrónico ya está en uso.")
             except Exception as e:
                 messages.error(request, f"Error interno: {e}")
-                
+              
             return redirect('asignar_materia_docente')
 
-        # 🔵 ACCIÓN 2: CREAR MATERIA
+        # 🔵 ACCIÓN 2: CREAR MATERIA EN MÚLTIPLES CURSOS
         elif 'crear_materia' in request.POST:
-            nombre = request.POST.get('nombre')
-            curso_id = request.POST.get('curso_id')
-            
-            if nombre and curso_id:
+            nombre = request.POST.get('nombre', '').strip()
+            # Captura la lista múltiple de cursos (cursos_ids) con respaldo a curso_id
+            cursos_ids = request.POST.getlist('cursos_ids') or request.POST.getlist('curso_id')
+            if not cursos_ids and request.POST.get('curso_id'):
+                cursos_ids = [request.POST.get('curso_id')]
+
+            print(f"\n>>> [CREAR MATERIA] Nombre: '{nombre}' | Cursos recibidos: {cursos_ids}")
+
+            if nombre and cursos_ids:
+                creadas = 0
+                existentes = 0
                 try:
-                    curso_obj = get_object_or_404(Curso, id=curso_id)
-                    Materia.objects.get_or_create(
-                        nombre=nombre.strip().title(),
-                        curso=curso_obj
-                    )
-                    messages.success(request, f'Materia "{nombre}" creada.')
+                    with transaction.atomic():
+                        for c_id in cursos_ids:
+                            curso_obj = get_object_or_404(Curso, id=c_id)
+                            _, created = Materia.objects.get_or_create(
+                                nombre=nombre.title(),
+                                curso=curso_obj
+                            )
+                            if created:
+                                creadas += 1
+                            else:
+                                existentes += 1
+
+                    if creadas > 0:
+                        messages.success(request, f'Materia "{nombre.title()}" creada exitosamente en {creadas} curso(s).')
+                    if existentes > 0:
+                        messages.info(request, f'La materia ya existía en {existentes} de los cursos seleccionados.')
                 except Exception as e:
-                    messages.error(request, f'Error: {e}')
+                    print(f">>> [ERROR DB]: {e}")
+                    messages.error(request, f'Error al registrar materia: {e}')
+            else:
+                messages.warning(request, 'Debes ingresar el nombre y marcar al menos un curso.')
+
             return redirect('asignar_materia_docente')
 
-        # 🟠 ACCIÓN 3: ASIGNAR DOCENTE
+        # 🟠 ACCIÓN 3: ASIGNAR MÚLTIPLES MATERIAS A DOCENTE
         elif 'asignar_docente' in request.POST:
-            materia_id = request.POST.get('materia_id')
             docente_id = request.POST.get('docente_id')
-            
-            try:
-                materia_obj = get_object_or_404(Materia, id=materia_id)
-                docente_obj = get_object_or_404(User, id=docente_id)
-                curso_obj = materia_obj.curso
-                
-                AsignacionMateria.objects.update_or_create(
-                    materia=materia_obj,
-                    curso=curso_obj,
-                    defaults={'docente': docente_obj, 'activo': True}
-                )
-                messages.success(request, f'Asignado: {docente_obj.get_full_name()}.')
-            except Exception as e:
-                messages.error(request, f'Error: {e}')
-                
+            materias_ids = request.POST.getlist('materias_ids') or request.POST.getlist('materia_id')
+            if not materias_ids and request.POST.get('materia_id'):
+                materias_ids = [request.POST.get('materia_id')]
+
+            print(f"\n>>> [ASIGNAR DOCENTE] Docente ID: {docente_id} | Materias recibidas: {materias_ids}")
+
+            if docente_id and materias_ids:
+                try:
+                    docente_obj = get_object_or_404(User, id=docente_id)
+                    total_asignadas = 0
+
+                    with transaction.atomic():
+                        for m_id in materias_ids:
+                            materia_obj = get_object_or_404(Materia, id=m_id)
+                            curso_obj = materia_obj.curso
+                          
+                            AsignacionMateria.objects.update_or_create(
+                                materia=materia_obj,
+                                curso=curso_obj,
+                                defaults={'docente': docente_obj, 'activo': True}
+                            )
+                            total_asignadas += 1
+
+                    nombre_docente = docente_obj.get_full_name().strip() or docente_obj.username
+                    messages.success(request, f'Se asignaron {total_asignadas} materia(s) al docente {nombre_docente}.')
+                except Exception as e:
+                    print(f">>> [ERROR ASIGNACIÓN]: {e}")
+                    messages.error(request, f'Error en la asignación: {e}')
+            else:
+                messages.warning(request, 'Debes elegir un docente y marcar al menos una materia.')
+              
             return redirect('asignar_materia_docente')
 
     context = {
@@ -2338,7 +2418,7 @@ def asignar_materia_docente(request):
         'materias': materias,
         'asignaciones': asignaciones
     }
-    
+  
     return render(request, 'admin/asignar_materia_docente.html', context)
 
 
@@ -6659,3 +6739,538 @@ def panel_api_toggle_acceso(request):
     except Exception as e:
         # Fallback silencioso para no tirar un Error 500 feo en pantalla
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+# tasks/views.py
+
+
+logger = logging.getLogger(__name__)
+
+
+# ==============================================================================
+# HUB DE SIMULADORES Y LABORATORIOS VIRTUALES (SOLO ESTUDIANTES)
+# ==============================================================================
+
+@login_required
+@role_required('ESTUDIANTE')
+@require_http_methods(["GET"])
+def student_simulators_hub(request: HttpRequest) -> HttpResponse:
+    """
+    Centro de comando de laboratorios virtuales para estudiantes.
+    - Complejidad temporal: O(N) estricta en una sola pasada de partición.
+    - Complejidad espacial: O(N) mínima mediante .only() en base de datos.
+    - Zero-query loops: Sin consultas SQL redundantes por categoría.
+    """
+    # 1. Recuperación en una única consulta indexada (B-Tree Scan)
+    active_sims = list(
+        Simulator.objects.active()
+        .only('uuid', 'title', 'subject', 'description', 'order')
+        .ordered()
+    )
+
+    # 2. Agrupamiento O(N) en memoria mediante hash map precalculado
+    grouped_map = defaultdict(list)
+    for sim in active_sims:
+        grouped_map[sim.subject].append(sim)
+
+    # 3. Construcción del diccionario estructurado preservando el orden de SubjectChoices
+    simulators_by_subject = {}
+    for code, label in Simulator.SubjectChoices.choices:
+        if code in grouped_map:
+            simulators_by_subject[str(label)] = grouped_map[code]
+
+    context = {
+        'simulators_by_subject': simulators_by_subject,
+        'total_simuladores': len(active_sims),
+    }
+    return render(request, 'simulators/student_hub.html', context)
+
+
+@login_required
+@role_required('ESTUDIANTE')
+@require_http_methods(["GET"])
+def simulator_viewer(request: HttpRequest, simulator_uuid: str) -> HttpResponse:
+    """
+    Visor in-app encapsulado (Zero-Trust Sandbox) para estudiantes.
+    - Mitigación IDOR: Búsqueda indexada por UUIDv4 criptográfico.
+    - AppSec: Inyección de cabeceras defensivas para prevenir fuga de Referer.
+    """
+    try:
+        val_uuid = uuid.UUID(str(simulator_uuid))
+    except (ValueError, AttributeError, TypeError):
+        raise Http404("El identificador criptográfico del simulador es inválido.")
+
+    simulator = get_object_or_404(
+        Simulator.objects.active().only('uuid', 'title', 'subject', 'description', 'url'),
+        uuid=val_uuid
+    )
+
+    response = render(request, 'simulators/viewer.html', {'simulator': simulator})
+
+    # Cabeceras de seguridad perimétrica: No filtrar la ruta interna de Learning Labs al iframe externo
+    response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+# ==============================================================================
+# GESTIÓN ADMINISTRATIVA DE SIMULADORES (SOLO ADMINISTRADOR)
+# ==============================================================================
+
+@login_required
+@role_required('ADMINISTRADOR')
+@require_http_methods(["GET", "POST"])
+def admin_simulators_list(request: HttpRequest) -> HttpResponse:
+    """
+    Panel de auditoría y gestión de simuladores.
+    - Transaccionalidad atómica ACID ante operaciones concurrentes.
+    - Paginación O(1) en RAM para prevenir desbordamientos de memoria del servidor.
+    - Captura especializada de colisiones por IntegrityError.
+    """
+    if request.method == 'POST':
+        form = SimulatorForm(request.POST)
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    sim_instance = form.save()
+                    logger.info(
+                        "SimulatorCreated",
+                        extra={
+                            "action": "create",
+                            "simulator_uuid": str(sim_instance.uuid),
+                            "title": sim_instance.title,
+                            "admin_user": request.user.username,
+                        }
+                    )
+                    messages.success(
+                        request,
+                        f"El simulador '{sim_instance.title}' ha sido publicado exitosamente."
+                    )
+                    return redirect('admin_simulators_list')
+            except IntegrityError as ie:
+                logger.warning("Colisión de integridad en simulador: %s", str(ie))
+                form.add_error('url', "Ya existe un registro con esta URL en el sistema.")
+            except DatabaseError as dbe:
+                logger.error("Falla de base de datos al persistir simulador: %s", str(dbe), exc_info=True)
+                messages.error(request, "Error interno de base de datos. Intente nuevamente.")
+        else:
+            messages.error(request, "El formulario contiene errores. Verifique los campos marcados.")
+    else:
+        form = SimulatorForm()
+
+    # QuerySet perezoso (Lazy evaluation): Paginación estricta a nivel SQL con LIMIT/OFFSET
+    simulators_qs = (
+        Simulator.objects.all()
+        .only('uuid', 'title', 'subject', 'order', 'is_active', 'url', 'created_at')
+        .order_by('subject', 'order', '-created_at')
+    )
+
+    paginator = Paginator(simulators_qs, 15)  # 15 registros por página para buffer óptimo
+    page_number = request.GET.get('page', 1)
+
+    try:
+        page_obj = paginator.get_page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.get_page(1)
+
+    context = {
+        'simulators': page_obj,
+        'page_obj': page_obj,
+        'form': form,
+        'total_registros': paginator.count,
+    }
+    return render(request, 'simulators/admin_manage.html', context)
+
+
+@login_required
+@role_required('ADMINISTRADOR')
+@require_POST
+def admin_simulator_delete(request: HttpRequest, simulator_uuid: str) -> HttpResponse:
+    """
+    Eliminación defensiva de simuladores con bloqueo pesimista ACID.
+    - Bloqueo de fila select_for_update() para mitigar condiciones de carrera TOCTOU.
+    - Restringido obligatoriamente a método POST con verificación CSRF.
+    """
+    try:
+        val_uuid = uuid.UUID(str(simulator_uuid))
+    except (ValueError, AttributeError, TypeError):
+        raise Http404("El identificador criptográfico del simulador es inválido.")
+
+    try:
+        with transaction.atomic():
+            # Bloqueo a nivel de fila en PostgreSQL hasta completar el borrado
+            simulator = (
+                Simulator.objects.select_for_update()
+                .filter(uuid=val_uuid)
+                .first()
+            )
+
+            if not simulator:
+                raise Http404("El simulador ya no existe o fue eliminado previamente.")
+
+            titulo_eliminado = simulator.title
+            simulator.delete()
+
+            logger.warning(
+                "SimulatorPurged",
+                extra={
+                    "action": "delete",
+                    "simulator_uuid": str(val_uuid),
+                    "title": titulo_eliminado,
+                    "admin_user": request.user.username,
+                }
+            )
+
+        messages.success(request, f"Simulador '{titulo_eliminado}' purgado con éxito.")
+    except DatabaseError as dbe:
+        logger.error("Error al purgar simulador %s: %s", str(val_uuid), str(dbe), exc_info=True)
+        messages.error(request, "No fue posible eliminar el registro debido a un bloqueo de base de datos.")
+
+    return redirect('admin_simulators_list')
+
+
+
+# ==============================================================================
+# HUB DE CLASES MAGISTRALES MULTIDISCIPLINARIAS (ESTUDIANTES & THEATER VIEW)
+# ==============================================================================
+
+
+
+
+@login_required
+@role_required('ESTUDIANTE')
+@require_http_methods(["GET"])
+def student_classes_hub(request: HttpRequest) -> HttpResponse:
+    """
+    Catálogo interactivo de clases magistrales por disciplina.
+    Agrupa en memoria O(N) para evitar N+1 queries.
+    """
+    classes_qs = MasterClass.objects.filter(is_active=True).order_by('subject', 'order', 'title')
+    
+    classes_by_subject = defaultdict(list)
+    for c in classes_qs:
+        classes_by_subject[c.get_subject_display()].append(c)
+
+    context = {
+        'classes_by_subject': dict(classes_by_subject),
+        'total_clases': classes_qs.count(),
+        'available_subjects': MasterClass.SubjectChoices.choices,
+    }
+    return render(request, 'classes/student_hub.html', context)
+
+
+@login_required
+@role_required('ESTUDIANTE')
+@require_http_methods(["GET"])
+def class_player_view(request: HttpRequest, class_uuid: uuid.UUID) -> HttpResponse:
+    current_class = get_object_or_404(MasterClass, uuid=class_uuid, is_active=True)
+    
+    playlist = MasterClass.objects.filter(
+        subject=current_class.subject,
+        is_active=True
+    ).order_by('order', 'title')
+
+    comments = current_class.comments.select_related('user').all()
+    user_has_liked = current_class.likes.filter(user=request.user).exists()
+    total_likes = current_class.likes.count()
+
+    context = {
+        'current_class': current_class,
+        'playlist': playlist,
+        'comments': comments,
+        'user_has_liked': user_has_liked,
+        'total_likes': total_likes,
+    }
+    return render(request, 'classes/player.html', context)
+
+
+@login_required
+@require_POST
+def api_toggle_class_like(request: HttpRequest, class_uuid: uuid.UUID) -> JsonResponse:
+    """Toggle asíncrono de likes con respuesta JSON."""
+    current_class = get_object_or_404(MasterClass, uuid=class_uuid, is_active=True)
+    like_instance = ClassLike.objects.filter(user=request.user, master_class=current_class).first()
+
+    if like_instance:
+        like_instance.delete()
+        liked = False
+    else:
+        ClassLike.objects.create(user=request.user, master_class=current_class)
+        liked = True
+
+    return JsonResponse({
+        'success': True,
+        'liked': liked,
+        'total_likes': current_class.likes.count()
+    })
+
+
+@login_required
+@require_POST
+def api_add_class_comment(request: HttpRequest, class_uuid) -> JsonResponse:
+    """Inyección reactiva y persistencia inmediata de comentarios."""
+    current_class = get_object_or_404(MasterClass, uuid=class_uuid, is_active=True)
+    content = request.POST.get('content', '').strip()
+    raw_ts = request.POST.get('timestamp', None)
+
+    if not content:
+        return JsonResponse({'success': False, 'error': 'El comentario no puede estar vacío.'}, status=400)
+
+    # Conversión segura de timestamp
+    video_ts = None
+    formatted_ts = None
+    if raw_ts and str(raw_ts).isdigit():
+        video_ts = int(raw_ts)
+        mins = video_ts // 60
+        secs = video_ts % 60
+        formatted_ts = f"{mins:02d}:{secs:02d}"
+
+    # Guardado directo y seguro
+    comment = ClassComment.objects.create(
+        master_class=current_class,
+        user=request.user,
+        content=content[:1200],
+        video_timestamp=video_ts
+    )
+
+    # Determinar nombre e inicial con fallbacks seguros
+    author_name = request.user.get_full_name().strip() or request.user.username
+    author_initial = (request.user.username[:1] or 'U').upper()
+
+    return JsonResponse({
+        'success': True,
+        'comment': {
+            'id': comment.id,
+            'author': author_name,
+            'author_initial': author_initial,
+            'content': comment.content,
+            'timestamp': formatted_ts,
+            'raw_seconds': comment.video_timestamp,
+            'created_at': comment.created_at.strftime("%d %b, %H:%M")
+        },
+        'total_comments': current_class.comments.count()
+    })
+# ==============================================================================
+# GESTIÓN INSTITUCIONAL DE CLASES MAGISTRALES (ADMINISTRADORES)
+# ==============================================================================
+
+@login_required
+@role_required('ADMIN')
+@require_http_methods(["GET", "POST"])
+def admin_classes_manage(request: HttpRequest) -> HttpResponse:
+    """
+    Panel administrativo: Carga, auditoría y control de publicación de clases.
+    """
+    if request.method == 'POST':
+        form = MasterClassForm(request.POST)
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    clase = form.save()
+                messages.success(request, f"Clase '{clase.title}' publicada exitosamente.")
+                return redirect('admin_classes_manage')
+            except IntegrityError as e:
+                logger.error("Error al persistir MasterClass: %s", e)
+                messages.error(request, "Error de integridad al registrar la clase.")
+            except DatabaseError as e:
+                logger.error("Fallo de base de datos en MasterClass: %s", e)
+                messages.error(request, "Error de persistencia en base de datos.")
+    else:
+        form = MasterClassForm()
+
+    classes_list = MasterClass.objects.all().order_by('subject', 'order')
+    paginator = Paginator(classes_list, 15)
+    page_number = request.GET.get('page', 1)
+
+    try:
+        page_obj = paginator.get_page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.get_page(1)
+
+    context = {
+        'form': form,
+        'classes': page_obj.object_list,
+        'page_obj': page_obj,
+        'total_registros': classes_list.count(),
+    }
+    return render(request, 'classes/admin_manage.html', context)
+
+
+@login_required
+@role_required('ADMIN')
+@require_POST
+def admin_class_delete(request: HttpRequest, class_uuid: uuid.UUID) -> HttpResponse:
+    """
+    Eliminación defensiva de una clase magistral.
+    """
+    clase = get_object_or_404(MasterClass, uuid=class_uuid)
+    titulo = clase.title
+    try:
+        with transaction.atomic():
+            clase.delete()
+        messages.success(request, f"La clase '{titulo}' fue eliminada correctamente.")
+    except DatabaseError as e:
+        logger.error("Error al purgar MasterClass %s: %s", class_uuid, e)
+        messages.error(request, "No se pudo eliminar el recurso debido a un error de base de datos.")
+
+    return redirect('admin_classes_manage')
+
+#### borrarlos comentarios de las clases 
+def check_is_admin(user) -> bool:
+    """
+    Comprobación de privilegios administrativos de alta tolerancia:
+    Reconoce Superusuarios, Staff de Django y perfiles con rol ADMIN/ADMINISTRADOR/COORDINADOR.
+    """
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser or user.is_staff:
+        return True
+    perfil = getattr(user, 'perfil', None)
+    if perfil and getattr(perfil, 'rol', None) in ['ADMIN', 'ADMINISTRADOR', 'COORDINADOR']:
+        return True
+    return False
+
+
+@login_required
+@require_POST
+def api_delete_class_comment(request: HttpRequest, comment_id: int) -> JsonResponse:
+    """Eliminación asíncrona de comentarios exclusiva para administradores (Respuesta JSON estricta)."""
+    if not check_is_admin(request.user):
+        return JsonResponse({
+            'success': False, 
+            'error': 'Permisos insuficientes para purgar aportes.'
+        }, status=403)
+
+    comment = get_object_or_404(ClassComment, id=comment_id)
+    master_class_uuid = comment.master_class.uuid
+    
+    comment.delete()
+    
+    total_remaining = ClassComment.objects.filter(master_class__uuid=master_class_uuid).count()
+    
+    return JsonResponse({
+        'success': True,
+        'total_comments': total_remaining
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def admin_classes_dashboard(request: HttpRequest) -> HttpResponse:
+    """Panel de administración, supervisión de clases y centro de moderación de comentarios."""
+    if not check_is_admin(request.user):
+        messages.error(request, "Acceso restringido: Se requieren credenciales administrativas.")
+        perfil = getattr(request.user, 'perfil', None)
+        if perfil and getattr(perfil, 'rol', None) == 'ESTUDIANTE':
+            return redirect('dashboard_estudiante')
+        return redirect('home')
+
+    subject_filter = request.GET.get('subject', '').strip()
+    
+    classes_qs = MasterClass.objects.annotate(
+        total_comments_count=Count('comments', distinct=True),
+        total_likes_count=Count('likes', distinct=True)
+    )
+
+    if subject_filter:
+        classes_qs = classes_qs.filter(subject=subject_filter)
+
+    classes_list = classes_qs.order_by('subject', 'order', 'title')
+
+    # Extracción segura de choices
+    subject_field = MasterClass._meta.get_field('subject')
+    subjects = list(subject_field.choices) if subject_field.choices else []
+    if not subjects:
+        distinct_subjects = MasterClass.objects.values_list('subject', flat=True).distinct()
+        subjects = [(s, str(s).capitalize()) for s in distinct_subjects if s]
+
+    # Cargar comentarios recientes con usuario y clase precargados para moderación
+    recent_comments = ClassComment.objects.select_related('user', 'master_class').order_by('-created_at')[:100]
+
+    context = {
+        'classes': classes_list,
+        'subjects': subjects,
+        'selected_subject': subject_filter,
+        'form': MasterClassForm(),
+        'recent_comments': recent_comments,
+        'total_clases': MasterClass.objects.count(),
+        'total_comentarios': ClassComment.objects.count(),
+        'total_likes': ClassLike.objects.count(),
+    }
+    return render(request, 'admin/classes_dashboard.html', context)
+
+
+@login_required
+@require_POST
+def admin_class_create(request: HttpRequest) -> HttpResponse:
+    """Creación de una nueva clase magistral."""
+    if not check_is_admin(request.user):
+        messages.error(request, "No tienes permisos para crear clases.")
+        return redirect('admin_classes_dashboard')
+
+    form = MasterClassForm(request.POST)
+    if form.is_valid():
+        nueva_clase = form.save()
+        messages.success(request, f"Clase '{nueva_clase.title}' creada exitosamente en {nueva_clase.get_subject_display()}.")
+    else:
+        messages.error(request, "Error al crear la clase. Verifica los campos ingresados.")
+    return redirect('admin_classes_dashboard')
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def admin_class_edit(request: HttpRequest, class_uuid) -> HttpResponse:
+    """Edición completa de metadatos de una clase magistral."""
+    if not check_is_admin(request.user):
+        messages.error(request, "No tienes permisos para editar clases.")
+        return redirect('admin_classes_dashboard')
+
+    master_class = get_object_or_404(MasterClass, uuid=class_uuid)
+
+    if request.method == 'POST':
+        form = MasterClassForm(request.POST, instance=master_class)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Clase '{master_class.title}' actualizada correctamente.")
+            return redirect('admin_classes_dashboard')
+        else:
+            messages.error(request, "Error al actualizar los datos de la clase. Revisa los campos.")
+    else:
+        form = MasterClassForm(instance=master_class)
+
+    context = {
+        'form': form,
+        'master_class': master_class,
+    }
+    return render(request, 'admin/class_edit.html', context)
+
+
+@login_required
+@require_POST
+def admin_class_delete(request: HttpRequest, class_uuid) -> HttpResponse:
+    """Eliminación física de la clase y en cascada de sus comentarios y likes."""
+    if not check_is_admin(request.user):
+        messages.error(request, "No tienes permisos para eliminar clases.")
+        return redirect('admin_classes_dashboard')
+
+    master_class = get_object_or_404(MasterClass, uuid=class_uuid)
+    titulo = master_class.title
+    master_class.delete()
+    messages.success(request, f"La clase '{titulo}' fue eliminada permanentemente del catálogo.")
+    return redirect('admin_classes_dashboard')
+
+
+@role_required('ADMINISTRADOR')
+def toggle_restriccion_usuario(request, user_id):
+    usuario = get_object_or_404(User, id=user_id)
+    perfil = usuario.perfil
+    
+    # Invertir el estado (Bloquear/Desbloquear)
+    perfil.acceso_restringido = not perfil.acceso_restringido
+    perfil.save()
+    
+    if perfil.acceso_restringido:
+        messages.warning(request, f"🔒 MODO DEGRADADO ACTIVADO: Se restringió el acceso a {usuario.get_full_name() or usuario.username}.")
+    else:
+        messages.success(request, f"🔓 ACCESO RESTAURADO: El usuario {usuario.get_full_name() or usuario.username} vuelve a tener acceso total.")
+        
+    return redirect(request.META.get('HTTP_REFERER', 'home'))

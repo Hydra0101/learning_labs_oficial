@@ -1,169 +1,406 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container py-5">
-    <div class="card p-5 shadow-lg border-0">
-        
-        <div class="d-flex justify-content-between align-items-center mb-4">
+<style>
+    :root {
+        --ga-bg-core: #020617;
+        --ga-surface-1: rgba(15, 23, 42, 0.85);
+        --ga-border: rgba(255, 255, 255, 0.08);
+        --ga-purple: #a855f7;
+        --ga-purple-glow: rgba(168, 85, 247, 0.35);
+        --ga-cyan: #38bdf8;
+        --ga-emerald: #10b981;
+        --ga-emerald-glow: rgba(16, 185, 129, 0.35);
+        --ga-text-main: #f8fafc;
+        --ga-text-muted: #94a3b8;
+    }
+
+    body {
+        background-color: var(--ga-bg-core) !important;
+        color: var(--ga-text-main);
+    }
+
+    .custom-scroll::-webkit-scrollbar { width: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.25); border-radius: 10px; }
+
+    .ga-master-card {
+        background: var(--ga-surface-1);
+        border: 1px solid var(--ga-border);
+        border-radius: 28px;
+        backdrop-filter: blur(24px);
+        box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7);
+    }
+
+    .ga-section-box {
+        background: rgba(2, 6, 23, 0.6);
+        border: 1px solid var(--ga-border);
+        border-radius: 22px;
+        padding: 1.75rem;
+    }
+
+    .selection-grid-container {
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid var(--ga-border);
+        border-radius: 16px;
+        padding: 1rem;
+        max-height: 250px;
+        overflow-y: auto;
+    }
+
+    /* Tarjeta nativa clickable */
+    .select-item-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 0.7rem 0.9rem;
+        cursor: pointer;
+        user-select: none;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0;
+        width: 100%;
+    }
+
+    .select-item-card:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Estado seleccionado automático por CSS nativo */
+    .select-item-card:has(input[type="checkbox"]:checked) {
+        background: rgba(168, 85, 247, 0.15) !important;
+        border-color: rgba(168, 85, 247, 0.45) !important;
+    }
+
+    .select-item-card input[type="checkbox"] {
+        accent-color: var(--ga-purple);
+        width: 1.2rem;
+        height: 1.2rem;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .ga-table thead th {
+        background: rgba(15, 23, 42, 0.95);
+        color: var(--ga-text-muted);
+        font-family: monospace;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        border-bottom: 1px solid var(--ga-border);
+        padding: 1rem 1.25rem;
+    }
+
+    .ga-table tbody td {
+        background: transparent;
+        color: var(--ga-text-main);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        padding: 1rem 1.25rem;
+        vertical-align: middle;
+    }
+
+    .btn-quick-tag {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--ga-border);
+        color: var(--ga-text-muted);
+        border-radius: 100px;
+        font-size: 0.72rem;
+        font-family: monospace;
+        padding: 0.25rem 0.65rem;
+    }
+
+    .btn-quick-tag:hover {
+        background: rgba(168, 85, 247, 0.2);
+        color: #fff;
+        border-color: var(--ga-purple);
+    }
+
+    .ga-input-control {
+        background: rgba(15, 23, 42, 0.9) !important;
+        border: 1px solid var(--ga-border) !important;
+        color: #fff !important;
+        border-radius: 14px !important;
+        padding: 0.75rem 1rem !important;
+    }
+
+    .ga-input-control:focus {
+        border-color: var(--ga-purple) !important;
+        box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2) !important;
+    }
+</style>
+
+<div class="container py-4 py-lg-5" style="max-width: 1400px;">
+    
+    <!-- MENSAJES Y ALERTAS -->
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show rounded-4 border-0 shadow" role="alert">
+            <i class="fas fa-info-circle me-2"></i>{{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="ga-master-card p-3 p-md-5">
+
+        <!-- HEADER -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
             <div>
-                <h2 class="text-primary fw-bold"><i class="fas fa-chalkboard-teacher me-2"></i>Gestión Académica</h2>
-                <p class="text-muted mb-0">Crea materias, registra docentes y asigna cargas académicas.</p>
+                <div class="d-flex align-items-center gap-3 mb-1">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3);">
+                        <i class="fas fa-chalkboard-teacher fs-5" style="color: var(--ga-purple);"></i>
+                    </div>
+                    <div>
+                        <h2 class="fw-black text-white mb-0">Gestión y Cargas Académicas</h2>
+                        <span class="text-white-50 font-monospace small">Creación masiva de asignaturas y vinculación de docentes</span>
+                    </div>
+                </div>
             </div>
-            <button type="button" class="btn btn-success fw-bold px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#crearDocenteModal">
-                <i class="fas fa-user-plus me-2"></i>Nuevo Docente
+
+            <button type="button" class="btn rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow" style="background: var(--ga-emerald); color: #fff;" data-bs-toggle="modal" data-bs-target="#crearDocenteModal">
+                <i class="fas fa-user-plus"></i>
+                <span class="font-monospace small">Nuevo Docente</span>
             </button>
         </div>
-        <hr>
 
-        <h4 class="mt-2 mb-3 text-dark fw-bold"><i class="fas fa-book me-2"></i>Crear Nueva Materia</h4>
-        <div class="bg-light p-4 rounded-3 mb-5 border">
+        <hr class="border-secondary border-opacity-25 my-4">
+
+        <!-- SECCIÓN 1: CREAR NUEVA MATERIA EN MÚLTIPLES CURSOS -->
+        <div class="ga-section-box mb-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="fas fa-book-open" style="color: var(--ga-purple);"></i>
+                <h5 class="fw-bold text-white mb-0">Creación Masiva de Asignaturas</h5>
+            </div>
+
             <form method="POST">
                 {% csrf_token %}
                 <input type="hidden" name="crear_materia" value="1">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-5">
-                        <label for="nombre_materia" class="form-label fw-bold">Nombre de la Materia</label>
-                        <input type="text" class="form-control" id="nombre_materia" name="nombre" placeholder="Ej: Matemáticas Avanzadas" required>
+
+                <div class="row g-4">
+                    <div class="col-12 col-lg-5">
+                        <label for="nombre_materia" class="form-label font-monospace small text-white-50">Nombre de la Asignatura</label>
+                        <input type="text" class="form-control ga-input-control font-monospace" id="nombre_materia" name="nombre" placeholder="Ej: Matemáticas, Química Orgánica..." required>
+                        <small class="text-white-50 d-block mt-2 font-sans" style="font-size: 0.78rem;">
+                            Se registrará automáticamente en cada curso que selecciones en el panel contiguo.
+                        </small>
                     </div>
-                    <div class="col-md-5">
-                        <label for="curso_materia" class="form-label fw-bold">Curso</label>
-                        <select class="form-select" id="curso_materia" name="curso_id" required>
-                            <option value="">Selecciona un curso</option>
-                            {% for curso in cursos %}
-                                <option value="{{ curso.id }}">{{ curso.nombre }}</option>
-                            {% endfor %}
-                        </select>
+
+                    <div class="col-12 col-lg-7">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="font-monospace small text-white-50">
+                                Cursos Destino (<span id="countCursos" class="text-info fw-bold">0</span> seleccionados)
+                            </span>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn btn-quick-tag" onclick="marcarTodos('cursos_ids', true)">Marcar Todos</button>
+                                <button type="button" class="btn btn-quick-tag" onclick="marcarTodos('cursos_ids', false)">Limpiar</button>
+                            </div>
+                        </div>
+
+                        <div class="selection-grid-container custom-scroll">
+                            <div class="row g-2">
+                                {% for curso in cursos %}
+                                <div class="col-12 col-sm-6 col-md-4">
+                                    <label class="select-item-card">
+                                        <input type="checkbox" name="cursos_ids" value="{{ curso.id }}" class="cursos_ids" onchange="actualizarConteos()">
+                                        <span class="small text-white text-truncate font-monospace">{{ curso.nombre }}</span>
+                                    </label>
+                                </div>
+                                {% empty %}
+                                <div class="col-12 text-center text-white-50 py-3 font-monospace small">No hay cursos registrados.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary w-100 fw-bold">
-                            <i class="fas fa-plus me-1"></i> Crear
+
+                    <div class="col-12 d-flex justify-content-end">
+                        <button type="submit" class="btn rounded-pill px-4 py-2 fw-bold font-monospace d-inline-flex align-items-center gap-2" style="background: var(--ga-purple); color: #fff; box-shadow: 0 0 16px var(--ga-purple-glow);">
+                            <i class="fas fa-layer-group"></i>
+                            <span>Crear en Cursos Seleccionados</span>
                         </button>
                     </div>
                 </div>
             </form>
         </div>
 
-        <h4 class="mb-3 text-dark fw-bold"><i class="fas fa-link me-2"></i>Asignar Carga Académica</h4>
-        <div class="bg-light p-4 rounded-3 mb-5 border">
+        <!-- SECCIÓN 2: ASIGNAR MÚLTIPLES MATERIAS A UN DOCENTE -->
+        <div class="ga-section-box mb-5">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="fas fa-link" style="color: var(--ga-cyan);"></i>
+                <h5 class="fw-bold text-white mb-0">Asignación Masiva de Carga a Docente</h5>
+            </div>
+
             <form method="POST">
                 {% csrf_token %}
                 <input type="hidden" name="asignar_docente" value="1">
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label for="docente_asignar" class="form-label fw-bold">Docente</label>
-                        <select class="form-select" id="docente_asignar" name="docente_id" required>
-                            <option value="">Selecciona un docente</option>
+
+                <div class="row g-4">
+                    <div class="col-12 col-lg-4">
+                        <label for="docente_asignar" class="form-label font-monospace small text-white-50">Docente Titular</label>
+                        <select class="form-select ga-input-control font-monospace" id="docente_asignar" name="docente_id" required>
+                            <option value="">-- Elige el Docente --</option>
                             {% for docente in docentes %}
-                                <option value="{{ docente.id }}">{{ docente.get_full_name|default:docente.username }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-4">
-                        <label for="materia_asignar" class="form-label fw-bold">Materia (y Curso)</label>
-                        <select class="form-select" id="materia_asignar" name="materia_id" required>
-                            <option value="">Selecciona una materia</option>
-                            {% for materia in materias %}
-                                <option value="{{ materia.id }}">{{ materia.nombre }} - {{ materia.curso.nombre }}</option>
+                                <option value="{{ docente.id }}">{{ docente.get_full_name|default:docente.username }} (@{{ docente.username }})</option>
                             {% endfor %}
                         </select>
                     </div>
 
-                    <div class="col-md-4 d-flex align-items-end">
-                        <button type="submit" class="btn btn-success w-100 fw-bold">
-                            <i class="fas fa-check-circle me-1"></i> Asignar Docente
+                    <div class="col-12 col-lg-8">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="font-monospace small text-white-50">
+                                Asignaturas (<span id="countMaterias" class="text-info fw-bold">0</span> seleccionadas)
+                            </span>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn btn-quick-tag" onclick="marcarTodos('materias_ids', true)">Marcar Todas</button>
+                                <button type="button" class="btn btn-quick-tag" onclick="marcarTodos('materias_ids', false)">Limpiar</button>
+                            </div>
+                        </div>
+
+                        <div class="selection-grid-container custom-scroll">
+                            <div class="row g-2">
+                                {% for materia in materias %}
+                                <div class="col-12 col-sm-6">
+                                    <label class="select-item-card">
+                                        <input type="checkbox" name="materias_ids" value="{{ materia.id }}" class="materias_ids" onchange="actualizarConteos()">
+                                        <div class="d-flex flex-column min-w-0">
+                                            <span class="small text-white text-truncate fw-bold font-monospace">{{ materia.nombre }}</span>
+                                            <span class="text-white-50 font-monospace" style="font-size: 0.7rem;">
+                                                <i class="fas fa-graduation-cap me-1" style="color: var(--ga-cyan);"></i>{{ materia.curso.nombre }}
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+                                {% empty %}
+                                <div class="col-12 text-center text-white-50 py-3 font-monospace small">No hay materias registradas.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 d-flex justify-content-end">
+                        <button type="submit" class="btn rounded-pill px-4 py-2 fw-bold font-monospace d-inline-flex align-items-center gap-2" style="background: var(--ga-emerald); color: #fff; box-shadow: 0 0 16px var(--ga-emerald-glow);">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Asignar Carga Académica</span>
                         </button>
                     </div>
                 </div>
             </form>
         </div>
 
-        <h4 class="mb-3 text-secondary fw-bold">Asignaciones Actuales</h4>
-        <div class="table-responsive">
-            <table class="table table-hover table-bordered align-middle">
-                <thead class="table-dark">
+        <!-- TABLA DE ASIGNACIONES -->
+        <h5 class="fw-bold text-white mb-3 font-monospace">
+            <i class="fas fa-clipboard-list me-2" style="color: var(--ga-purple);"></i>Asignaciones Vigentes
+        </h5>
+
+        <div class="table-responsive rounded-4 border border-secondary border-opacity-25" style="background: rgba(2, 6, 23, 0.7);">
+            <table class="table ga-table mb-0">
+                <thead>
                     <tr>
                         <th>Docente</th>
                         <th>Usuario</th>
-                        <th>Materia</th>
+                        <th>Asignatura</th>
                         <th>Curso</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for asignacion in asignaciones %}
                     <tr>
-                        <td class="fw-bold text-primary">{{ asignacion.docente.get_full_name|default:asignacion.docente.username }}</td>
-                        <td><code>{{ asignacion.docente.username }}</code></td>
-                        <td>{{ asignacion.materia.nombre }}</td>
-                        <td><span class="badge bg-secondary">{{ asignacion.curso.nombre }}</span></td>
+                        <td>
+                            <span class="fw-bold text-white font-sans">{{ asignacion.docente.get_full_name|default:asignacion.docente.username }}</span>
+                        </td>
+                        <td>
+                            <code class="px-2 py-1 rounded-2" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">
+                                @{{ asignacion.docente.username }}
+                            </code>
+                        </td>
+                        <td>
+                            <span class="fw-bold text-light font-monospace">{{ asignacion.materia.nombre }}</span>
+                        </td>
+                        <td>
+                            <span class="badge rounded-pill font-monospace" style="background: rgba(56, 189, 248, 0.15); color: var(--ga-cyan); border: 1px solid rgba(56, 189, 248, 0.3);">
+                                {{ asignacion.curso.nombre }}
+                            </span>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center text-muted py-3">No hay asignaciones registradas.</td>
+                        <td colspan="4" class="text-center py-5 text-white-50 font-monospace">
+                            No existen asignaciones de materias registradas actualmente.
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+
     </div>
 </div>
 
+<!-- MODAL CREAR DOCENTE -->
 <div class="modal fade" id="crearDocenteModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title fw-bold"><i class="fas fa-user-tie me-2"></i>Registrar Nuevo Docente</h5>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0" style="background: #0f172a; border: 1px solid var(--ga-border) !important;">
+            <div class="modal-header border-secondary border-opacity-25 p-4">
+                <h5 class="modal-title fw-bold text-white mb-0"><i class="fas fa-user-tie text-success me-2"></i>Registrar Nuevo Docente</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST">
                 {% csrf_token %}
                 <input type="hidden" name="crear_profesor" value="1">
-                
-                <div class="modal-body">
-                    <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
-                        <i class="fas fa-lock me-2 fs-4"></i>
-                        <div class="small">
-                            El docente se creará con la contraseña temporal: <strong>123456</strong> (o la definida por el sistema) y deberá cambiarla al iniciar sesión.
-                        </div>
+                <div class="modal-body p-4 d-flex flex-column gap-3">
+                    <div>
+                        <label class="form-label font-monospace small text-white-50">Usuario (Login)</label>
+                        <input type="text" name="username" class="form-control ga-input-control font-monospace" required placeholder="Ej: lrodriguez">
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Usuario (Login)</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="fas fa-user"></i></span>
-                            <input type="text" name="username" class="form-control" required placeholder="Ej: lrodriguez" autocomplete="off">
-                        </div>
-                        <div class="form-text">Debe ser único en el sistema.</div>
-                    </div>
-
-                    <div class="row g-2 mb-3">
+                    <div class="row g-2">
                         <div class="col-6">
-                            <label class="form-label fw-bold">Nombres</label>
-                            <input type="text" name="first_name" class="form-control" required placeholder="Nombres">
+                            <label class="form-label font-monospace small text-white-50">Nombres</label>
+                            <input type="text" name="first_name" class="form-control ga-input-control" required placeholder="Nombres">
                         </div>
                         <div class="col-6">
-                            <label class="form-label fw-bold">Apellidos</label>
-                            <input type="text" name="last_name" class="form-control" required placeholder="Apellidos">
+                            <label class="form-label font-monospace small text-white-50">Apellidos</label>
+                            <input type="text" name="last_name" class="form-control ga-input-control" required placeholder="Apellidos">
                         </div>
                     </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Correo Electrónico</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-                            <input type="email" name="email" class="form-control" required placeholder="correo@ejemplo.com">
-                        </div>
+                    <div>
+                        <label class="form-label font-monospace small text-white-50">Correo Electrónico</label>
+                        <input type="email" name="email" class="form-control ga-input-control font-monospace" required placeholder="profesor@colegio.edu.co">
                     </div>
                 </div>
-                
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success fw-bold px-4">
-                        <i class="fas fa-save me-2"></i>Registrar
+                <div class="modal-footer border-secondary border-opacity-25 p-3">
+                    <button type="button" class="btn btn-outline-light rounded-pill px-4 font-monospace btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn rounded-pill px-4 fw-bold font-monospace btn-sm" style="background: var(--ga-emerald); color: #fff;">
+                        Guardar Docente
                     </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+    function marcarTodos(className, state) {
+        document.querySelectorAll('.' + className).forEach(cb => {
+            cb.checked = state;
+        });
+        actualizarConteos();
+    }
+
+    function actualizarConteos() {
+        const totalCursos = document.querySelectorAll('.cursos_ids:checked').length;
+        const totalMaterias = document.querySelectorAll('.materias_ids:checked').length;
+        
+        const countC = document.getElementById('countCursos');
+        const countM = document.getElementById('countMaterias');
+
+        if (countC) countC.textContent = totalCursos;
+        if (countM) countM.textContent = totalMaterias;
+    }
+
+    document.addEventListener('DOMContentLoaded', actualizarConteos);
+</script>
 {% endblock %}

@@ -911,7 +911,7 @@
                                 <li><hr class="dropdown-divider my-1"></li>
                                 <li><a class="dropdown-item" href="{% url 'ver_perfil_social' user.username %}"><i class="fas fa-user-circle text-primary"></i> Mi Perfil Social</a></li>
                                 <li><hr class="dropdown-divider my-1"></li>
-                                <li><a class="dropdown-item text-danger" href="{% url 'signout' %}"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</a></li>
+                                <li><a class="dropdown-item text-danger" href="{% url 'signout' %}" hx-boost="false"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</a></li>
                             </ul>
                         </li>
 

@@ -1,0 +1,503 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    :root {
+        --admin-bg-surface: #ffffff;
+        --admin-border-subtle: rgba(226, 232, 240, 0.8);
+        --admin-primary: #0284c7;
+        --admin-primary-dark: #0369a1;
+        --admin-slate-dark: #0f172a;
+    }
+
+    /* KPI Summary Cards */
+    .kpi-card-metric {
+        background: #ffffff;
+        border: 1px solid var(--admin-border-subtle);
+        border-radius: 18px;
+        padding: 1.25rem 1.5rem;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .kpi-card-metric:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Interactive Table */
+    .admin-data-table {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .admin-data-table thead th {
+        background-color: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        font-weight: 700;
+        padding: 0.85rem 1rem;
+    }
+    .admin-data-table tbody td {
+        padding: 1rem;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 0.875rem;
+    }
+    .admin-data-table tbody tr:hover td {
+        background-color: #f8fafc;
+    }
+
+    /* URL Preview Badge */
+    .url-preview-pill {
+        max-width: 200px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: inline-block;
+        vertical-align: middle;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.75rem;
+        background: #f1f5f9;
+        padding: 2px 8px;
+        border-radius: 6px;
+        color: #475569;
+        text-decoration: none;
+    }
+    .url-preview-pill:hover {
+        color: var(--admin-primary);
+        background: #e2e8f0;
+    }
+
+    /* Floating URL Status Checker in Form */
+    .url-validation-status {
+        font-size: 0.75rem;
+        transition: all 0.2s ease;
+    }
+</style>
+
+<div class="container-fluid px-4 py-4 max-w-7xl">
+    
+    <!-- 1. ENCABEZADO ESTRATÉGICO Y RETORNO -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 font-monospace small">
+                    <i class="fas fa-microchip me-1"></i> Core Module v4.2
+                </span>
+                <span class="badge bg-light text-muted border rounded-pill small font-monospace">Acceso Administrativo</span>
+            </div>
+            <h1 class="h3 fw-black text-dark mb-0 tracking-tight">Gestor Institucional de Simuladores</h1>
+            <p class="text-muted small mb-0">Centro de despliegue, parametrización y auditoría de laboratorios interactivos.</p>
+        </div>
+        
+        <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary rounded-pill px-3 py-2 d-inline-flex align-items-center gap-2 fw-semibold">
+                <i class="fas fa-arrow-left"></i>
+                <span>Dashboard Principal</span>
+            </a>
+            <a href="{% url 'student_simulators_hub' %}" target="_blank" class="btn btn-dark rounded-pill px-3 py-2 d-inline-flex align-items-center gap-2 fw-semibold shadow-sm">
+                <i class="fas fa-eye text-info"></i>
+                <span>Vista Estudiante</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- 2. TELEMETRÍA Y KPIS DE RECURSOS -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="kpi-card-metric d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small d-block font-monospace text-uppercase" style="font-size: 0.7rem;">Total Recursos</span>
+                    <h3 class="fw-black text-dark m-0">{{ total_registros|default:"0" }}</h3>
+                </div>
+                <div class="p-3 bg-light rounded-circle text-primary">
+                    <i class="fas fa-layer-group fa-lg"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="kpi-card-metric d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small d-block font-monospace text-uppercase" style="font-size: 0.7rem;">Módulos Activos</span>
+                    <h3 class="fw-black text-success m-0" id="kpiActiveCount">-</h3>
+                </div>
+                <div class="p-3 bg-success bg-opacity-10 rounded-circle text-success">
+                    <i class="fas fa-check-circle fa-lg"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="kpi-card-metric d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small d-block font-monospace text-uppercase" style="font-size: 0.7rem;">Módulos Ocultos</span>
+                    <h3 class="fw-black text-secondary m-0" id="kpiHiddenCount">-</h3>
+                </div>
+                <div class="p-3 bg-secondary bg-opacity-10 rounded-circle text-secondary">
+                    <i class="fas fa-eye-slash fa-lg"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="kpi-card-metric d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small d-block font-monospace text-uppercase" style="font-size: 0.7rem;">Protocolo Seguro</span>
+                    <h3 class="fw-black text-cyan m-0 text-info">100%</h3>
+                </div>
+                <div class="p-3 bg-info bg-opacity-10 rounded-circle text-info">
+                    <i class="fas fa-shield-alt fa-lg"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. PANEL DUAL: CARGA Y AUDITORÍA -->
+    <div class="row g-4">
+        
+        <!-- Formulario de Registro e Inyección -->
+        <div class="col-12 col-xl-5">
+            <div class="card border-0 shadow-sm p-4 rounded-4 bg-white position-sticky" style="top: 2rem;">
+                <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-3">
+                    <div>
+                        <h5 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                            <i class="fas fa-cloud-upload-alt text-primary"></i> Registrar Simulador
+                        </h5>
+                        <small class="text-muted">Inyecta nuevos laboratorios al catálogo.</small>
+                    </div>
+                    <span class="badge bg-light text-dark border font-monospace small">Idempotente</span>
+                </div>
+
+                <form method="POST" id="simulatorUploadForm" novalidate>
+                    {% csrf_token %}
+                    
+                    <!-- Campo: Título -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase tracking-wider">Título del Módulo</label>
+                        {{ form.title }}
+                        {% if form.title.errors %}
+                            <div class="text-danger small mt-1 font-monospace">{{ form.title.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Campo: Materia -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase tracking-wider">Materia / Disciplina</label>
+                        {{ form.subject }}
+                        {% if form.subject.errors %}
+                            <div class="text-danger small mt-1 font-monospace">{{ form.subject.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Campo: Descripción Pedagógica -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase tracking-wider">Descripción y Metodología</label>
+                        {{ form.description }}
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <small class="text-muted" style="font-size: 0.72rem;">Sintetiza los objetivos de aprendizaje.</small>
+                            <small class="text-muted font-monospace" style="font-size: 0.72rem;" id="descCharCount">0/1500</small>
+                        </div>
+                        {% if form.description.errors %}
+                            <div class="text-danger small mt-1 font-monospace">{{ form.description.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Campo: URL Segura -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase tracking-wider">URL del Applet (HTTPS)</label>
+                        {{ form.url }}
+                        <div id="urlFeedback" class="url-validation-status mt-1 font-monospace text-muted">
+                            <i class="fas fa-lock me-1"></i> Requiere protocolo HTTPS estricto.
+                        </div>
+                        {% if form.url.errors %}
+                            <div class="text-danger small mt-1 font-monospace">{{ form.url.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Fila: Orden y Toggle de Visibilidad -->
+                    <div class="row g-3 mb-4 align-items-center">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted text-uppercase tracking-wider">Secuencia / Orden</label>
+                            {{ form.order }}
+                            {% if form.order.errors %}
+                                <div class="text-danger small mt-1 font-monospace">{{ form.order.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-6 pt-3">
+                            <div class="p-2 border rounded-3 d-flex align-items-center justify-content-between bg-light">
+                                <span class="small fw-bold text-dark">Visible alumnos</span>
+                                {{ form.is_active }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botón de Envío -->
+                    <button type="submit" class="btn btn-primary w-100 rounded-pill py-2 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" id="submitBtn">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Guardar y Habilitar</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Tabla de Registros y Control de Estado -->
+        <div class="col-12 col-xl-7">
+            <div class="card border-0 shadow-sm p-4 rounded-4 bg-white">
+                
+                <!-- Barra de Búsqueda de Tabla y Filtro In-Memory -->
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-4 pb-2 border-bottom">
+                    <div>
+                        <h5 class="fw-bold text-dark mb-0">Catálogo Operativo</h5>
+                        <small class="text-muted font-monospace">Paginación O(1) con buffer óptimo</small>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-light border-end-0 rounded-start-pill"><i class="fas fa-search text-muted"></i></span>
+                            <input type="text" id="adminTableSearch" class="form-control bg-light border-start-0 rounded-end-pill font-sans" placeholder="Filtrar en esta página...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Datos Segura -->
+                <div class="table-responsive">
+                    <table class="table admin-data-table align-middle w-100" id="simulatorsAdminTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">Ord</th>
+                                <th>Simulador / Título</th>
+                                <th>Materia</th>
+                                <th>Estado</th>
+                                <th class="text-end" style="width: 120px;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sim in simulators %}
+                            <tr class="sim-row-item" data-title="{{ sim.title|lower }}" data-subject="{{ sim.get_subject_display|lower }}">
+                                <td class="font-monospace text-muted fw-bold">
+                                    #{{ sim.order }}
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark text-truncate" style="max-width: 240px;" title="{{ sim.title }}">
+                                        {{ sim.title }}
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2 mt-1">
+                                        <a href="{{ sim.url }}" target="_blank" rel="noopener noreferrer" class="url-preview-pill" title="{{ sim.url }}">
+                                            <i class="fas fa-link me-1"></i>{{ sim.url }}
+                                        </a>
+                                        <button class="btn btn-sm btn-link p-0 text-muted" onclick="copySimulatorUuid('{{ sim.uuid }}')" title="Copiar UUID criptográfico">
+                                            <i class="far fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill font-monospace small">
+                                        {{ sim.get_subject_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if sim.is_active %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-1 small sim-status-indicator" data-status="active">
+                                            <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i> Activo
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-1 small sim-status-indicator" data-status="hidden">
+                                            <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i> Oculto
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex align-items-center gap-1">
+                                        <!-- Test In-App Viewer -->
+                                        <a href="{% url 'simulator_viewer' sim.uuid %}" target="_blank" class="btn btn-sm btn-light rounded-circle text-primary" title="Probar en Sandbox">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+
+                                        <!-- Botón de Purgado Defensivo (Modal Trigger) -->
+                                        <button type="button" 
+                                                class="btn btn-sm btn-light rounded-circle text-danger hover-danger"
+                                                onclick="openDeleteModal('{{ sim.uuid }}', '{{ sim.title|escapejs }}')"
+                                                title="Eliminar de forma permanente">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-5">
+                                    <i class="fas fa-box-open fa-3x mb-3 d-block text-muted opacity-50"></i>
+                                    <span class="fw-semibold">No hay simuladores dados de alta en este ciclo.</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 4. PAGINACIÓN O(1) -->
+                {% if page_obj.has_other_pages %}
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3 pt-3 border-top mt-2">
+                    <small class="text-muted font-monospace">
+                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }} ({{ total_registros }} registros)
+                    </small>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link rounded-start-pill" href="?page={{ page_obj.previous_page_number }}" aria-label="Anterior">
+                                        <i class="fas fa-chevron-left small"></i>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled"><span class="page-link rounded-start-pill"><i class="fas fa-chevron-left small"></i></span></li>
+                            {% endif %}
+
+                            <li class="page-item active">
+                                <span class="page-link font-monospace">{{ page_obj.number }}</span>
+                            </li>
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link rounded-end-pill" href="?page={{ page_obj.next_page_number }}" aria-label="Siguiente">
+                                        <i class="fas fa-chevron-right small"></i>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled"><span class="page-link rounded-end-pill"><i class="fas fa-chevron-right small"></i></span></li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- MODAL DEFENSIVO DE CONFIRMACIÓN DE BORRADO (ZERO ACCIDENTAL DELETION) -->
+<div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="p-2 bg-danger bg-opacity-10 text-danger rounded-circle" style="width: 40px; height: 40px; display: grid; place-items: center;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-dark fs-6" id="deleteModalLabel">Confirmación de Purgado</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="text-secondary small mb-2">
+                    Estás a punto de eliminar de forma permanente el simulador:
+                </p>
+                <div class="p-3 bg-light rounded-3 border mb-3">
+                    <span class="fw-bold text-dark d-block text-truncate" id="modalTargetTitle">---</span>
+                    <small class="text-muted font-monospace" id="modalTargetUuid" style="font-size: 0.75rem;">---</small>
+                </div>
+                <div class="alert alert-warning py-2 px-3 small border-0 rounded-3 mb-0">
+                    <i class="fas fa-info-circle me-1"></i> Esta acción no se puede deshacer. Los estudiantes perderán el acceso de inmediato.
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4 btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <form id="confirmedDeleteForm" method="POST" action="">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 btn-sm fw-bold">
+                        Sí, Eliminar Registro
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SCRIPT OPERATIVO DE INTERACCIÓN CLIENT-SIDE -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // 1. Cálculo reactivo de KPIs de la página cargada
+        const indicators = document.querySelectorAll('.sim-status-indicator');
+        let activeCount = 0;
+        let hiddenCount = 0;
+        indicators.forEach(ind => {
+            if (ind.getAttribute('data-status') === 'active') activeCount++;
+            else hiddenCount++;
+        });
+        document.getElementById('kpiActiveCount').textContent = activeCount;
+        document.getElementById('kpiHiddenCount').textContent = hiddenCount;
+
+        // 2. Contador de caracteres en la descripción
+        const descTextarea = document.querySelector('textarea[name="description"]');
+        const descCounter = document.getElementById('descCharCount');
+        if (descTextarea && descCounter) {
+            const updateCount = () => {
+                descCounter.textContent = `${descTextarea.value.length}/1500`;
+            };
+            descTextarea.addEventListener('input', updateCount);
+            updateCount();
+        }
+
+        // 3. Validador visual interactivo del protocolo de la URL
+        const urlInput = document.querySelector('input[name="url"]');
+        const urlFeedback = document.getElementById('urlFeedback');
+        if (urlInput && urlFeedback) {
+            urlInput.addEventListener('input', () => {
+                const val = urlInput.value.trim().toLowerCase();
+                if (val === '') {
+                    urlFeedback.className = "url-validation-status mt-1 font-monospace text-muted";
+                    urlFeedback.innerHTML = '<i class="fas fa-lock me-1"></i> Requiere protocolo HTTPS estricto.';
+                } else if (val.startsWith('https://')) {
+                    urlFeedback.className = "url-validation-status mt-1 font-monospace text-success";
+                    urlFeedback.innerHTML = '<i class="fas fa-check-circle me-1"></i> Protocolo seguro verificado (HTTPS).';
+                } else {
+                    urlFeedback.className = "url-validation-status mt-1 font-monospace text-danger";
+                    urlFeedback.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i> Inválido: La URL debe comenzar estrictamente con https://';
+                }
+            });
+        }
+
+        // 4. Filtrado en tiempo real de filas de la tabla
+        const tableSearch = document.getElementById('adminTableSearch');
+        const tableRows = document.querySelectorAll('.sim-row-item');
+        if (tableSearch) {
+            tableSearch.addEventListener('input', (e) => {
+                const q = e.target.value.trim().toLowerCase();
+                tableRows.forEach(row => {
+                    const title = row.getAttribute('data-title') || '';
+                    const subject = row.getAttribute('data-subject') || '';
+                    if (q === '' || title.includes(q) || subject.includes(q)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+    });
+
+    // 5. Función de copia de UUID al portapapeles
+    window.copySimulatorUuid = function(uuid) {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(uuid).then(() => {
+                alert(`UUID copiado al portapapeles:\n${uuid}`);
+            });
+        }
+    };
+
+    // 6. Preparación del Modal de Eliminación con inyección de ruta
+    window.openDeleteModal = function(uuid, title) {
+        document.getElementById('modalTargetTitle').textContent = title;
+        document.getElementById('modalTargetUuid').textContent = `UUID: ${uuid}`;
+        
+        // Reconstrucción de URL canónica de borrado
+        const deleteUrl = `/panel/simuladores/${uuid}/eliminar/`;
+        document.getElementById('confirmedDeleteForm').action = deleteUrl;
+
+        const modalElem = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
+        modalElem.show();
+    };
+</script>
+{% endblock %}

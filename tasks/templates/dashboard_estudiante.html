@@ -44,7 +44,8 @@
                 </div>
             </div>
 
-            <div class="d-none d-md-flex d-grid gap-3 justify-content-md-center mt-5 mb-2 stagger-fade-in">
+            <div class="d-none d-md-flex d-grid gap-3 justify-content-md-center mt-5 mb-2 stagger-fade-in flex-wrap">
+                <!-- 1. SIMULADOR EXISTENTE -->
                 <button onclick="toggleSimulador()" class="btn btn-lg omni-btn-quantum rounded-pill px-5 py-3 w-100 w-md-auto transition-transform" aria-label="Ingresar al Simulador Académico">
                     <div class="btn-glow-layer"></div>
                     <span class="position-relative z-index-2 d-flex align-items-center justify-content-center text-uppercase tracking-widest">
@@ -52,6 +53,7 @@
                     </span>
                 </button>
 
+                <!-- 2. LABS CUÁNTICOS 3D EXISTENTE -->
                 <a href="{% url 'hub_simuladores' %}" hx-boost="false" class="btn btn-lg rounded-pill px-5 py-3 w-100 w-md-auto transition-transform d-flex align-items-center justify-content-center border border-accent shadow-glow-aurora position-relative overflow-hidden" style="background: var(--gradient-cyber); color: white; z-index: 1; text-decoration: none;" aria-label="Acceder a Labs Cuánticos" onmouseover="this.style.transform='translateY(-4px) scale(1.02)'; this.style.boxShadow='0 0 30px rgba(217, 70, 239, 0.8)';" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='var(--shadow-glow-aurora)';">
                     <div class="position-absolute top-0 start-0 w-100 h-100 bg-gradient-aurora opacity-20 transition-all-300" style="z-index: -1;"></div>
                     <i class="fas fa-vr-cardboard me-3 fs-4 text-accent-candy animate__animated animate__pulse animate__infinite"></i>
@@ -59,17 +61,32 @@
                     <span class="position-absolute top-0 end-0 mt-2 me-3 badge bg-void text-accent-candy border border-accent rounded-pill fs-10 shadow-glow-aurora">3D ENGINE</span>
                 </a>
 
+                <!-- 3. NUEVO: HUB DE SIMULADORES POR MATERIA (QUÍMICA, FÍSICA, ETC.) -->
+                <a href="{% url 'student_simulators_hub' %}" class="btn btn-lg rounded-pill px-5 py-3 w-100 w-md-auto transition-transform d-flex align-items-center justify-content-center border border-info shadow-sm position-relative overflow-hidden" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: white; z-index: 1; text-decoration: none;" aria-label="Simuladores por Materia" onmouseover="this.style.transform='translateY(-3px) scale(1.01)';" onmouseout="this.style.transform='translateY(0) scale(1)';">
+                    <i class="fas fa-flask-vial me-2 fs-5 text-cyan animate__animated animate__pulse animate__infinite"></i>
+                    <span class="text-uppercase tracking-widest fw-black font-monospace">Simuladores por Materia</span>
+                    <span class="badge bg-dark text-cyan border border-info rounded-pill ms-2 font-monospace" style="font-size: 0.65rem;">HUB</span>
+                </a>
+                <!-- NUEVO: HUB DE CLASES MAGISTRALES (MULTIDISCIPLINAR) -->
+                <a href="{% url 'student_classes_hub' %}" class="btn btn-lg rounded-pill px-5 py-3 w-100 w-md-auto transition-transform d-flex align-items-center justify-content-center border shadow-sm position-relative overflow-hidden" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); border-color: rgba(192, 132, 252, 0.4) !important; color: white; z-index: 1; text-decoration: none;" aria-label="Acceder a Clases Magistrales" onmouseover="this.style.transform='translateY(-3px) scale(1.01)';" onmouseout="this.style.transform='translateY(0) scale(1)';">
+                    <i class="fas fa-play-circle me-2 fs-5 text-purple animate__animated animate__pulse animate__infinite" style="color: #c084fc;"></i>
+                    <span class="text-uppercase tracking-widest fw-black font-monospace">Clases Teóricas</span>
+                    <span class="badge bg-dark rounded-pill ms-2 font-monospace" style="color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.4); font-size: 0.65rem;">CINEMA</span>
+                </a>
+                <!-- 4. ANÁLISIS DE MEJORA EXISTENTE -->
                 <button onclick="activarIA('est_mejoras')" class="btn btn-lg omni-btn-primary rounded-pill px-4 py-3 w-100 w-md-auto transition-transform text-uppercase tracking-widest" aria-label="Análisis de Mejora">
                     <i class="fas fa-network-wired me-2"></i>Análisis de Mejora
                 </button>
                 
+                <!-- 5. TUTOR SOCRÁTICO EXISTENTE -->
                 <button onclick="abrirModalPareto()" class="btn btn-lg omni-btn-outline rounded-pill px-4 py-3 w-100 w-md-auto transition-transform text-uppercase tracking-widest" aria-label="Tutor Socrático">
                     <i class="fas fa-project-diagram me-2 text-accent-candy"></i>Tutor Socrático (80/20)
                 </button>
 
-                 <button onclick="activarIA('est_nivelacion')" class="btn btn-lg omni-btn-danger rounded-pill px-4 py-3 w-100 w-md-auto transition-transform text-uppercase tracking-widest" aria-label="Protocolo de Rescate">
-                     <i class="fas fa-heartbeat me-2 heartbeat-hover"></i>Protocolo de Rescate
-                 </button>
+                <!-- 6. PROTOCOLO DE RESCATE EXISTENTE -->
+                <button onclick="activarIA('est_nivelacion')" class="btn btn-lg omni-btn-danger rounded-pill px-4 py-3 w-100 w-md-auto transition-transform text-uppercase tracking-widest" aria-label="Protocolo de Rescate">
+                    <i class="fas fa-heartbeat me-2 heartbeat-hover"></i>Protocolo de Rescate
+                </button>
             </div>
             
             <div class="omni-info-pill mt-4 mx-auto px-4 py-2 d-inline-block rounded-pill shadow-inner-dark bg-dark-omni border border-secondary">
@@ -101,13 +118,32 @@
             </div>
         </div>
         <div class="action-menu-scroll px-3 pb-3 pt-1">
-            <button onclick="toggleSimulador()" class="app-action-card bg-gradient-cyber shadow-hover text-start border border-cyan position-relative overflow-hidden group-hover-target" aria-label="Abrir Simulador">
-                <div class="action-icon bg-white-10 border border-cyan mb-3"><i class="fas fa-gamepad text-cyan group-hover-spin fs-4"></i></div>
-                <h6 class="fw-black text-white mb-1 mt-3">Simulador</h6>
-                <small class="text-cyan font-monospace fw-bold fs-9 lh-1 d-block text-uppercase">Práctica Activa</small>
-                <div class="card-glow-effect"></div>
-            </button>
+    <!-- 1. SIMULADOR EXISTENTE (SE MANTIENE INTACTO) -->
+    <button onclick="toggleSimulador()" class="app-action-card bg-gradient-cyber shadow-hover text-start border border-cyan position-relative overflow-hidden group-hover-target" aria-label="Abrir Simulador">
+        <div class="action-icon bg-white-10 border border-cyan mb-3"><i class="fas fa-gamepad text-cyan group-hover-spin fs-4"></i></div>
+        <h6 class="fw-black text-white mb-1 mt-3">Simulador</h6>
+        <small class="text-cyan font-monospace fw-bold fs-9 lh-1 d-block text-uppercase">Práctica Activa</small>
+        <div class="card-glow-effect"></div>
+    </button>
 
+    <!-- 2. NUEVO: HUB DE SIMULADORES POR MATERIA (QUÍMICA, FÍSICA, ETC.) -->
+    <a href="{% url 'student_simulators_hub' %}" class="app-action-card bg-gradient-cyber shadow-hover text-start border border-cyan position-relative overflow-hidden group-hover-target text-decoration-none d-block" aria-label="Abrir Simuladores por Materia">
+        <div class="action-icon bg-white-10 border border-cyan mb-3">
+            <i class="fas fa-flask-vial text-cyan group-hover-spin fs-4"></i>
+        </div>
+        <h6 class="fw-black text-white mb-1 mt-3">Labs por Materia</h6>
+        <small class="text-cyan font-monospace fw-bold fs-9 lh-1 d-block text-uppercase">Hub Científico</small>
+        <div class="card-glow-effect"></div>
+    </a>
+    <!-- NUEVO: TARJETA MÓVIL CLASES MAGISTRALES -->
+        <a href="{% url 'student_classes_hub' %}" class="app-action-card bg-gradient-cyber shadow-hover text-start border position-relative overflow-hidden group-hover-target text-decoration-none d-block" style="border-color: rgba(192, 132, 252, 0.4) !important;" aria-label="Abrir Clases Magistrales">
+            <div class="action-icon bg-white-10 border mb-3" style="border-color: rgba(192, 132, 252, 0.4) !important;">
+                <i class="fas fa-play-circle group-hover-spin fs-4" style="color: #c084fc;"></i>
+            </div>
+            <h6 class="fw-black text-white mb-1 mt-3">Clases</h6>
+            <small class="font-monospace fw-bold fs-9 lh-1 d-block text-uppercase" style="color: #c084fc;">Video Hub</small>
+            <div class="card-glow-effect"></div>
+        </a>
             <a href="{% url 'hub_simuladores' %}" hx-boost="false" class="app-action-card bg-gradient-cyber shadow-hover text-start border border-accent position-relative overflow-hidden group-hover-target text-decoration-none shadow-glow-aurora" aria-label="Abrir Labs Cuánticos">
                 <div class="position-absolute top-0 start-0 w-100 bg-gradient-aurora" style="height: 3px;"></div>
                 <div class="action-icon bg-accent-candy-light border border-accent mb-3"><i class="fas fa-vr-cardboard text-accent-candy group-hover-bounce fs-4 text-shadow-glow-aurora"></i></div>

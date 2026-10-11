@@ -17,7 +17,7 @@ from django.db.models import Max    #importacion necesaria para el acta instituc
 import os
 from django.core.validators import MinValueValidator, MaxValueValidator
 
-
+from urllib.parse import urlparse
 
 import uuid
 import hashlib
@@ -87,80 +87,85 @@ ROLES_CHOICES = (
 # ===================================================================
 # PERFILES Y USUARIOS
 # ===================================================================
-
 class Perfil(models.Model):
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True)
-    rol = models.CharField(max_length=20, choices=ROLES_CHOICES, default='ESTUDIANTE')
-    
-    # --- FLAGS ADMINISTRATIVOS ---
-    es_director = models.BooleanField(default=False)
-    requiere_cambio_clave = models.BooleanField(default=False)
-    # 🔥🔥🔥 AGREGA ESTE CAMPO AQUÍ 🔥🔥🔥
-    numero_documento = models.CharField(
-        max_length=30, 
-        blank=True, 
-        null=True, 
-        verbose_name="Documento de Identidad",
-        db_index=True, # Importante para búsquedas rápidas
-        help_text="Cédula, TI, Pasaporte, etc."
-    )
-    # --- IDENTIDAD VISUAL Y SOCIAL ---
-    foto_perfil = models.ImageField(upload_to='perfiles/avatars/', blank=True, null=True, verbose_name="Foto de Perfil")
-    foto_portada = models.ImageField(upload_to='perfiles/covers/', blank=True, null=True, verbose_name="Foto de Portada")
-    biografia = models.TextField(max_length=500, blank=True, verbose_name="Sobre mí")
-    
-    # --- NUEVOS CAMPOS: INTERESES Y GUSTOS ---
-    hobbies = models.TextField(blank=True, null=True, verbose_name="Mis Hobbies")
-    gustos_musicales = models.CharField(max_length=255, blank=True, null=True, verbose_name="Música favorita")
-    libros_favoritos = models.TextField(blank=True, null=True, verbose_name="Libros que me gustan")
-    materia_favorita = models.CharField(max_length=100, blank=True, null=True, verbose_name="Materia favorita")
-    metas_anio = models.TextField(blank=True, null=True, verbose_name="Metas del año lectivo")
-    
-    # --- GAMIFICACIÓN Y ESTADO ---
-    puntos_reputacion = models.IntegerField(default=0, verbose_name="Reputación Académica")
-    last_seen = models.DateTimeField(null=True, blank=True, verbose_name="Última vez visto")
-    
-    # --- PRIVACIDAD ---
-    perfil_publico = models.BooleanField(default=True, help_text="Si es falso, solo profesores y compañeros de curso pueden verlo.")
+   user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True)
+   rol = models.CharField(max_length=20, choices=ROLES_CHOICES, default='ESTUDIANTE')
+  
+   # --- FLAGS ADMINISTRATIVOS ---
+   es_director = models.BooleanField(default=False)
+   requiere_cambio_clave = models.BooleanField(default=False)
+   
+   # 🔥 NUEVO CAMPO: BLOQUEO PARCIAL / MODO DEGRADADO 🔥
+   acceso_restringido = models.BooleanField(
+       default=False, 
+       verbose_name="Acceso Restringido (Bloqueo de estadísticas/social)"
+   )
 
-    # ==========================================
-    # 📱 SISTEMA DE ALERTAS SMS (NUEVO)
-    # ==========================================
-    telefono_sms = models.CharField(
-        max_length=15,
-        blank=True,
-        null=True,
-        verbose_name="Celular para Alertas",
-        help_text="Número para notificaciones urgentes (+57...)"
-    )
-    recibir_sms = models.BooleanField(
-        default=True,
-        verbose_name="Activar Notificaciones SMS",
-        help_text="Si se desactiva, no llegarán alertas al celular."
-    )
-    ultimo_sms_enviado = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="Control de spam para no enviar mensajes repetidos el mismo día."
-    )
-
-    def __str__(self):
-        return f"Perfil de {self.user.username}"
-
-    def __str__(self):
-        return f'{self.user.username} ({self.get_rol_display()})'
-
-    class Meta:
-        verbose_name = 'Perfil de Usuario'
-        verbose_name_plural = 'Perfiles de Usuario'
-        
-    @property
-    def esta_en_linea(self):
-        """Retorna True si el usuario tuvo actividad en los últimos 5 minutos."""
-        if self.last_seen:
-            now = timezone.now()
-            return now - self.last_seen < timezone.timedelta(minutes=5)
-        return False
+   # 🔥🔥🔥 AGREGA ESTE CAMPO AQUÍ 🔥🔥🔥
+   numero_documento = models.CharField(
+       max_length=30,
+       blank=True,
+       null=True,
+       verbose_name="Documento de Identidad",
+       db_index=True, # Importante para búsquedas rápidas
+       help_text="Cédula, TI, Pasaporte, etc."
+   )
+   # --- IDENTIDAD VISUAL Y SOCIAL ---
+   foto_perfil = models.ImageField(upload_to='perfiles/avatars/', blank=True, null=True, verbose_name="Foto de Perfil")
+   foto_portada = models.ImageField(upload_to='perfiles/covers/', blank=True, null=True, verbose_name="Foto de Portada")
+   biografia = models.TextField(max_length=500, blank=True, verbose_name="Sobre mí")
+  
+   # --- NUEVOS CAMPOS: INTERESES Y GUSTOS ---
+   hobbies = models.TextField(blank=True, null=True, verbose_name="Mis Hobbies")
+   gustos_musicales = models.CharField(max_length=255, blank=True, null=True, verbose_name="Música favorita")
+   libros_favoritos = models.TextField(blank=True, null=True, verbose_name="Libros que me gustan")
+   materia_favorita = models.CharField(max_length=100, blank=True, null=True, verbose_name="Materia favorita")
+   metas_anio = models.TextField(blank=True, null=True, verbose_name="Metas del año lectivo")
+  
+   # --- GAMIFICACIÓN Y ESTADO ---
+   puntos_reputacion = models.IntegerField(default=0, verbose_name="Reputación Académica")
+   last_seen = models.DateTimeField(null=True, blank=True, verbose_name="Última vez visto")
+  
+   # --- PRIVACIDAD ---
+   perfil_publico = models.BooleanField(default=True, help_text="Si es falso, solo profesores y compañeros de curso pueden verlo.")
+   # ==========================================
+   # 📱 SISTEMA DE ALERTAS SMS (NUEVO)
+   # ==========================================
+   telefono_sms = models.CharField(
+       max_length=15,
+       blank=True,
+       null=True,
+       verbose_name="Celular para Alertas",
+       help_text="Número para notificaciones urgentes (+57...)"
+   )
+   recibir_sms = models.BooleanField(
+       default=True,
+       verbose_name="Activar Notificaciones SMS",
+       help_text="Si se desactiva, no llegarán alertas al celular."
+   )
+   ultimo_sms_enviado = models.DateTimeField(
+       null=True,
+       blank=True,
+       help_text="Control de spam para no enviar mensajes repetidos el mismo día."
+   )
+   
+   def __str__(self):
+       return f"Perfil de {self.user.username}"
+       
+   def __str__(self):
+       return f'{self.user.username} ({self.get_rol_display()})'
+       
+   class Meta:
+       verbose_name = 'Perfil de Usuario'
+       verbose_name_plural = 'Perfiles de Usuario'
+      
+   @property
+   def esta_en_linea(self):
+       """Retorna True si el usuario tuvo actividad en los últimos 5 minutos."""
+       if self.last_seen:
+           now = timezone.now()
+           return now - self.last_seen < timezone.timedelta(minutes=5)
+       return False
 
 
 class SocialGroup(models.Model):
@@ -2316,4 +2321,303 @@ class BovedaSeguridad(models.Model):
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest() == self.checksum_sha256
 
+def validate_secure_simulator_url(value: str) -> None:
+    """
+    AppSec Validator: Previene SSRF, iframe hijacking y scheme injection.
+    Exige protocolo HTTPS estricto y bloquea direcciones IP privadas o esquemas inseguros.
+    """
+    parsed = urlparse(value)
+    if parsed.scheme.lower() != 'https':
+        raise ValidationError(
+            _("Protocolo inseguro. Los simuladores deben servirse estrictamente bajo HTTPS."),
+            code='insecure_protocol'
+        )
+    if not parsed.netloc:
+        raise ValidationError(
+            _("La URL proporcionada no contiene un dominio válido."),
+            code='invalid_domain'
+        )
+    # Bloqueo de resolución contra localhost / rangos loopback locales
+    blocked_hosts = {'localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254'}
+    hostname = parsed.hostname.lower() if parsed.hostname else ''
+    if hostname in blocked_hosts or hostname.startswith('192.168.') or hostname.startswith('10.'):
+        raise ValidationError(
+            _("Destino de red no permitido por políticas de seguridad institucional."),
+            code='forbidden_network_target'
+        )
 
+
+class SimulatorQuerySet(models.QuerySet):
+    """Encapsulación de consultas a nivel de dominio (DDD)."""
+    def active(self):
+        return self.filter(is_active=True)
+
+    def by_subject(self, subject: str):
+        return self.filter(subject=subject)
+
+    def ordered(self):
+        return self.order_by('subject', 'order', 'title')
+
+
+class SimulatorManager(models.Manager):
+    def get_queryset(self):
+        return SimulatorQuerySet(self.model, using=self._db)
+
+    def active(self):
+        return self.get_queryset().active()
+
+    def by_subject(self, subject: str):
+        return self.get_queryset().by_subject(subject)
+
+
+class Simulator(models.Model):
+    """
+    Entidad central de laboratorios y simuladores interactivos.
+    Diseñada con índices de cobertura B-Tree, identificadores criptográficos (UUIDv4)
+    para prevención de IDOR, y compatibilidad óptima con motores ACID.
+    """
+
+    class SubjectChoices(models.TextChoices):
+        QUIMICA = 'QUIMICA', _('Química')
+        FISICA = 'FISICA', _('Física')
+        MATEMATICAS = 'MATEMATICAS', _('Matemáticas')
+        BIOLOGIA = 'BIOLOGIA', _('Biología')
+        ROBOTICA = 'ROBOTICA', _('Robótica / Tecnología')
+
+    # Identificador público opaco (Anti-IDOR / Anti-Scraping)
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True,
+        help_text=_("Identificador público expuesto en endpoints y front-end.")
+    )
+
+    title = models.CharField(
+        max_length=200,
+        db_index=True,
+        verbose_name=_("Título del Simulador")
+    )
+
+    subject = models.CharField(
+        max_length=32,
+        choices=SubjectChoices.choices,
+        default=SubjectChoices.QUIMICA,
+        db_index=True,
+        verbose_name=_("Materia / Área")
+    )
+
+    description = models.TextField(
+        max_length=1500,
+        verbose_name=_("Descripción Didáctica / Pedagógica"),
+        help_text=_("Explicación pedagógica sintetizada para el estudiante.")
+    )
+
+    url = models.URLField(
+        max_length=600,
+        validators=[validate_secure_simulator_url],
+        verbose_name=_("URL del Simulador / Applet"),
+        help_text=_("Enlace seguro HTTPS para encapsulamiento iframe.")
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        verbose_name=_("Activo para estudiantes"),
+        help_text=_("Controla si el simulador es visible en el hub de los estudiantes.")
+    )
+
+    order = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name=_("Orden de aparición"),
+        help_text=_("Prioridad secuencial de renderizado dentro de la materia.")
+    )
+
+    # Telemetría de auditoría temporal
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        editable=False,
+        verbose_name=_("Fecha de Creación")
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        editable=False,
+        verbose_name=_("Última Modificación")
+    )
+
+    # Inyección de Managers de Dominio
+    objects = SimulatorManager()
+
+    class Meta:
+        db_table = 'academic_simulator'
+        verbose_name = _("Simulador")
+        verbose_name_plural = _("Simuladores")
+        ordering = ['subject', 'order', 'title']
+        indexes = [
+            # Índice compuesto B-Tree para optimización exacta del filtrado del Hub
+            models.Index(
+                fields=['subject', 'is_active', 'order'],
+                name='idx_sim_subj_active_ord'
+            ),
+            # Índice parcial (optimización en PostgreSQL para lecturas de activos)
+            models.Index(
+                fields=['is_active', 'order'],
+                condition=models.Q(is_active=True),
+                name='idx_sim_active_order'
+            ),
+        ]
+        constraints = [
+            # Garantiza unicidad del recurso por URL para evitar duplicados en DB
+            models.UniqueConstraint(
+                fields=['url'],
+                name='unique_simulator_url'
+            ),
+        ]
+
+    def clean(self):
+        """Validaciones de integridad y normalización previas al guardado."""
+        super().clean()
+        if self.title:
+            self.title = self.title.strip()
+        if self.description:
+            self.description = self.description.strip()
+        if self.url:
+            self.url = self.url.strip()
+
+    def __str__(self) -> str:
+        return f"[{self.get_subject_display()}] {self.title}"
+# ==============================================================================
+# MODELO: CLASES MAGISTRALES Y RECURSOS MULTIDISCIPLINARIOS (VIDEO HUB)
+# ==============================================================================
+
+class MasterClass(models.Model):
+    class SubjectChoices(models.TextChoices):
+        QUIMICA = 'QUIMICA', 'Química'
+        FISICA = 'FISICA', 'Física'
+        MATEMATICAS = 'MATEMATICAS', 'Matemáticas'
+        BIOLOGIA = 'BIOLOGIA', 'Biología'
+        INGLES = 'INGLES', 'Inglés'
+        PROGRAMACION = 'PROGRAMACION', 'Programación & Software'
+        ROBOTICA = 'ROBOTICA', 'Robótica & IoT'
+        LECTURA_CRITICA = 'LECTURA_CRITICA', 'Lectura Crítica'
+        LOGICA = 'LOGICA', 'Lógica & Filosofía'
+        CIENCIAS_SOCIALES = 'CIENCIAS_SOCIALES', 'Ciencias Sociales'
+        OTRA = 'OTRA', 'Otra Disciplina'
+
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        db_index=True
+    )
+    title = models.CharField(
+        max_length=255,
+        verbose_name="Título del Tema / Clase"
+    )
+    subject = models.CharField(
+        max_length=50,
+        choices=SubjectChoices.choices,
+        default=SubjectChoices.QUIMICA,
+        db_index=True,
+        verbose_name="Materia / Disciplina"
+    )
+    description = models.TextField(
+        verbose_name="Descripción y Objetivos Pedagógicos"
+    )
+    video_url = models.URLField(
+        max_length=800,
+        verbose_name="URL Directa del Video (Cloudflare R2 / Cloudinary / CDN)"
+    )
+    duration_minutes = models.PositiveIntegerField(
+        default=45,
+        verbose_name="Duración Estimada (minutos)"
+    )
+    order = models.PositiveIntegerField(
+        default=1,
+        verbose_name="Secuencia Curricular"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        verbose_name="Visible para Estudiantes"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['subject', 'order', 'title']
+        verbose_name = "Clase Magistral"
+        verbose_name_plural = "Clases Magistrales"
+        indexes = [
+            models.Index(fields=['subject', 'is_active', 'order']),
+        ]
+
+    def __str__(self):
+        return f"[{self.get_subject_display()}] #{self.order} - {self.title}"
+
+
+# ==============================================================================
+# MODELOS SOCIALES Y ENGAGEMENT: CLASES MAGISTRALES (GOD-TIER LEVEL)
+# ==============================================================================
+
+class ClassLike(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='class_likes'
+    )
+    master_class = models.ForeignKey(
+        MasterClass,
+        on_delete=models.CASCADE,
+        related_name='likes'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'master_class')
+        verbose_name = "Like de Clase"
+        verbose_name_plural = "Likes de Clases"
+
+    def __str__(self):
+        return f"{self.user.username} ❤️ {self.master_class.title}"
+
+
+class ClassComment(models.Model):
+    master_class = models.ForeignKey(
+        MasterClass,
+        on_delete=models.CASCADE,
+        related_name='comments',
+        verbose_name="Clase Magistral"
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='class_comments',
+        verbose_name="Autor"
+    )
+    content = models.TextField(
+        max_length=1200,
+        verbose_name="Contenido del Comentario"
+    )
+    video_timestamp = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Segundo exacto del video (Timestamp)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Comentario de Clase"
+        verbose_name_plural = "Comentarios de Clase"
+
+    def __str__(self):
+        return f"{self.user.username} en {self.master_class.title}"
+
+    @property
+    def formatted_timestamp(self):
+        if self.video_timestamp is None:
+            return None
+        mins = self.video_timestamp // 60
+        secs = self.video_timestamp % 60
+        return f"{mins:02d}:{secs:02d}"

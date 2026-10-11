@@ -74,6 +74,7 @@ MIDDLEWARE = [
     'tasks.middleware.ForcePasswordChangeMiddleware',
     # 🛡️ Middleware de Auditoría y Seguridad (Paso 10)
     'tasks.middleware.AuditMiddleware',
+    'tasks.middleware.BloqueoParcialMiddleware', # <--- AGREGA ESTE ÚLTIMO
 ]
 
 ROOT_URLCONF = 'djangocrud.urls'
