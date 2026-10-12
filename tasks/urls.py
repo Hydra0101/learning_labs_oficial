@@ -512,5 +512,5 @@ urlpatterns = [
     path('clases/<uuid:class_uuid>/editar/', views.admin_class_edit, name='admin_class_edit'),
     path('clases/<uuid:class_uuid>/eliminar/', views.admin_class_delete, name='admin_class_delete'),
     path('panel/toggle-restriccion/<int:user_id>/', views.toggle_restriccion_usuario, name='toggle_restriccion_usuario'),
-
+    path('ai-engine/', views.ai_engine, name='ai_engine'),
 ]

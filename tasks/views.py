@@ -11,6 +11,21 @@ from .models import Simulator
 from django.db.models import Count
 from .models import MasterClass, ClassLike, ClassComment
 
+# ==============================================================================
+# 🧠 FENIX_CORE: ENDPOINT DE INTELIGENCIA ARTIFICIAL (GOD-TIER API)
+# ==============================================================================
+# Controlador central para la IA. Implementa manejo de excepciones de nivel
+# empresarial, decoradores de seguridad y conexión directa con el centinela.
+# ==============================================================================
+import logging
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from .services.ai_sentinel import AISentinelService
+
+# Inicialización Singleton del Cortafuegos Cuántico (Solo se crea una vez en RAM)
+fenix_sentinel = AISentinelService()
+logger_ia = logging.getLogger("fenix.api")
+
 from collections import defaultdict
 import logging
 import uuid
@@ -7274,3 +7289,46 @@ def toggle_restriccion_usuario(request, user_id):
         messages.success(request, f"🔓 ACCESO RESTAURADO: El usuario {usuario.get_full_name() or usuario.username} vuelve a tener acceso total.")
         
     return redirect(request.META.get('HTTP_REFERER', 'home'))
+
+@require_http_methods(["GET", "POST"])
+def ai_engine(request):
+    """
+    Endpoint de grado defensivo para procesamiento de IA.
+    Enrutado y protegido estrictamente a través de AISentinelService.
+    """
+    try:
+        # Soporte híbrido: Atrapa la acción sin importar si viene por URL (GET) o formulario invisible (POST)
+        action = request.GET.get('action') or request.POST.get('action')
+        
+        if action == 'chat_socratico':
+            # Extracción y limpieza del payload
+            user_query = request.GET.get('user_query', request.POST.get('user_query', '')).strip()
+            
+            if not user_query:
+                return JsonResponse({
+                    'success': False, 
+                    'content': 'Parámetro de consulta vacío. Abortando transmisión.'
+                }, status=400)
+
+            # Identificación de firma de origen (Bloqueo preciso por IP si no hay sesión)
+            user_id = str(request.user.id) if request.user.is_authenticated else request.META.get('REMOTE_ADDR', 'anon_ip')
+            
+            # 🛡️ INTERCEPCIÓN DEL GUARDÍAN (Aquí se frena la fuga de tokens)
+            resultado = fenix_sentinel.ejecutar_chat(user_id=user_id, query=user_query)
+            
+            # Si el circuito se abrió por un bucle, respondemos con código HTTP 429 (Too Many Requests)
+            status_code = 200 if resultado.get('success') else (429 if resultado.get('circuit_tripped') else 400)
+            
+            return JsonResponse(resultado, status=status_code)
+
+        # Si alguien intenta inyectar una acción no válida
+        logger_ia.warning(f"[SEGURIDAD] Intento de acción desconocida en AI_ENGINE: {action}")
+        return JsonResponse({'success': False, 'content': 'Directiva de IA no autorizada.'}, status=403)
+
+    except Exception as e:
+        # Escudo final: Si el servidor de Django colapsa, nunca le enviamos un error feo de HTML al Frontend
+        logger_ia.error(f"[AI_ENGINE PANIC] Falla masiva en el endpoint: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False, 
+            'content': 'El núcleo neuronal experimentó una falla crítica. Reintentar más tarde.'
+        }, status=500)
